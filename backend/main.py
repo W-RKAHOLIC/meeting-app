@@ -18,7 +18,7 @@ app.add_middleware(
 
 # 🚨 여기에 아까 메모장에 만들어둔 내 Supabase 주소를 따옴표 안에 붙여넣으세요!
 # 예시: "postgresql://postgres.xxx:내비밀번호@aws-0-ap-northeast-2.pooler.supabase.com:6543/postgres"
-DB_URL = postgresql://postgres:zapping1234!@db.vorafaavxcziayxapppi.supabase.co:5432/postgres
+DB_URL = "ㅑpostgresql://postgres:zapping1234!@db.vorafaavxcziayxapppi.supabase.co:5432/postgres"
 
 def get_db_connection():
     return psycopg2.connect(DB_URL)
