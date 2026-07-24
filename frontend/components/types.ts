@@ -1,7 +1,8 @@
-export type Step = 'CREATE' | 'LOGIN' | 'GRID';
+export type Step = 'HOME' | 'CREATE' | 'LOGIN' | 'GRID'; // 💡 HOME 단계 추가
 export type VoteType = 'BEST' | 'POSSIBLE' | 'IMPOSSIBLE';
 
 export interface RoomConfig {
+  roomCode: string; // 💡 방 고유 코드 추가
   title: string;
   startDate: string;
   endDate: string;
