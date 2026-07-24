@@ -1,12 +1,11 @@
 'use client'
 
 import React, { useState, useEffect } from 'react';
-import { MessageCircle, X, Edit2, Trash2 } from 'lucide-react';
+import { X, Edit2, Trash2 } from 'lucide-react'; // MessageCircle 제외됨
 
 // --- 타입 정의 ---
 type VoteType = 'BEST' | 'POSSIBLE' | 'IMPOSSIBLE';
 interface Comment { id: string; text: string; }
-// 상태가 null일 수 있도록 허용 (코멘트만 달린 경우를 위해)
 interface CellData { state: VoteType | null; comments: Comment[]; }
 
 const DATES = ['7/20(목)', '7/21(금)', '7/22(토)', '7/23(일)'];
@@ -59,26 +58,21 @@ export default function TimeGrid() {
     const cell = cells[key];
 
     if (selectedVote) {
-      // 투표 모드일 때
       if (cell && cell.state === selectedVote) {
-        // 이미 칠해진 색을 지울 때, 코멘트가 있으면 상태만 비우고 셀은 유지
         if (cell.comments.length > 0) {
           setCells(prev => ({ ...prev, [key]: { ...cell, state: null } }));
         } else {
-          // 코멘트도 없으면 아예 셀 삭제
           const newCells = { ...cells };
           delete newCells[key];
           setCells(newCells);
         }
       } else {
-        // 색칠하기
         setCells(prev => ({
           ...prev,
           [key]: { state: selectedVote, comments: cell ? cell.comments : [] },
         }));
       }
     } else {
-      // 투표 툴이 없을 때는 코멘트 바텀 시트 열기
       setActiveCellKey(key);
       setEditingCommentId(null);
     }
@@ -90,7 +84,7 @@ export default function TimeGrid() {
     setCells(prev => ({
       ...prev,
       [activeCellKey]: {
-        state: prev[activeCellKey]?.state || null, // 색칠 강제 추가 없이 기존 상태 유지
+        state: prev[activeCellKey]?.state || null, 
         comments: [...(prev[activeCellKey]?.comments || []), newComment],
       },
     }));
@@ -127,7 +121,6 @@ export default function TimeGrid() {
     setEditingCommentId(null);
   };
 
-  // 색상 맵핑
   const getVoteColor = (type: VoteType) => {
     switch (type) {
       case 'BEST': return 'bg-blue-500 border-blue-600 text-white';
@@ -183,12 +176,11 @@ export default function TimeGrid() {
                     onClick={() => handleCellClick(d, t)}
                     className={`w-full h-12 mb-[2px] border-[0.5px] border-gray-200 transition-colors relative cursor-pointer rounded-md mx-[1px] ${bgColor}`}
                   >
-                    {/* 크고 꽉 찬 말풍선 아이콘 렌더링 */}
+                    {/* 확실하게 보이는 이모지 💬 테스트 */}
                     {hasComments && (
-                      <MessageCircle 
-                        className={`absolute top-1 right-1 w-4 h-4 drop-shadow-sm ${cell?.state ? 'text-white' : 'text-blue-500'}`} 
-                        fill="currentColor"
-                      />
+                      <div className="absolute top-0 right-1 text-sm z-10 drop-shadow-md">
+                        💬
+                      </div>
                     )}
                   </div>
                 );
