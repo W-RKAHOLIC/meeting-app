@@ -2,7 +2,7 @@
 
 import React, { useState } from 'react';
 import { Users } from 'lucide-react';
-import { User } from '../types';
+import { User } from './types'; // 💡 수정됨
 
 export default function ParticipantLoginScreen({ roomTitle, onLogin }: { roomTitle: string, onLogin: (user: User) => void }) {
   const [name, setName] = useState('');

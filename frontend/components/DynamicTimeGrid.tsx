@@ -2,7 +2,7 @@
 
 import React, { useState, useEffect } from 'react';
 import { X, Trash2 } from 'lucide-react';
-import { RoomConfig, User, VoteType, CellData, Comment } from '../types';
+import { RoomConfig, User, VoteType, CellData, Comment } from './types'; // 💡 수정됨
 
 function generateDates(start: string, end: string) {
   const dates = [];

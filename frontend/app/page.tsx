@@ -4,7 +4,7 @@ import React, { useState } from 'react';
 import HostCreateScreen from '../components/HostCreateScreen';
 import ParticipantLoginScreen from '../components/ParticipantLoginScreen';
 import DynamicTimeGrid from '../components/DynamicTimeGrid';
-import { Step, RoomConfig, User } from '../types';
+import { Step, RoomConfig, User } from '../components/types'; // 💡 수정됨
 
 export default function ScheduleApp() {
   const [step, setStep] = useState<Step>('CREATE');

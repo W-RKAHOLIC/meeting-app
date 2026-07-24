@@ -2,7 +2,7 @@
 
 import React, { useState } from 'react';
 import { Calendar, Clock, ArrowRight } from 'lucide-react';
-import { RoomConfig } from '../types';
+import { RoomConfig } from './types'; // 💡 수정됨
 
 export default function HostCreateScreen({ onComplete }: { onComplete: (config: RoomConfig) => void }) {
   const [title, setTitle] = useState('');
