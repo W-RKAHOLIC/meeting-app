@@ -8,43 +8,63 @@ import DynamicTimeGrid from '../components/DynamicTimeGrid';
 import { Step, RoomConfig, User } from '../components/types';
 
 export default function ScheduleApp() {
-  const [step, setStep] = useState<Step>('HOME'); // 💡 첫 화면을 HOME으로 시작!
+  const [step, setStep] = useState<Step>('HOME');
   const [roomConfig, setRoomConfig] = useState<RoomConfig | null>(null);
   const [currentUser, setCurrentUser] = useState<User | null>(null);
+  const [isHost, setIsHost] = useState(false); // 💡 방장 여부 상태 추가
 
-  // --- 화면 0: 홈 화면 (주최자 vs 참여자 선택) ---
   if (step === 'HOME') {
     return <HomeScreen 
       onCreate={() => setStep('CREATE')} 
-      onJoin={(code) => {
-        // 💡 실제로는 여기서 백엔드에 코드를 보내 방 정보를 불러와야 합니다. (지금은 시뮬레이션)
-        alert(`[백엔드 통신 시뮬레이션]\n입력하신 코드(${code})의 방 정보를 서버에서 불러옵니다!`);
-        
-        // 가상의 방 데이터 세팅
-        setRoomConfig({
-          roomCode: code,
-          title: '초대받은 시뮬레이션 회의',
-          startDate: '2026-07-25',
-          endDate: '2026-07-28',
-          startTime: '10:00',
-          endTime: '15:00',
-          interval: 60
-        });
-        setStep('LOGIN');
+      onJoin={async (code) => {
+        try {
+          const res = await fetch(`http://localhost:8000/api/rooms/${code}`);
+          if (!res.ok) throw new Error('방을 찾을 수 없습니다. 코드를 확인해주세요.');
+          
+          const data = await res.json();
+          setRoomConfig(data);
+          
+          // 💡 입장 시 내 브라우저에 이 방의 마스터 키가 있는지 확인합니다!
+          const savedToken = localStorage.getItem(`hostToken_${code}`);
+          if (savedToken) setIsHost(true);
+          else setIsHost(false);
+
+          setStep('LOGIN');
+        } catch (err: any) {
+          alert(err.message);
+        }
       }} 
     />;
   }
 
-  // --- 화면 1: 주최자 방 생성 ---
   if (step === 'CREATE') {
-    return <HostCreateScreen onComplete={(config) => {
-      alert(`방이 성공적으로 생성되었습니다!\n🎉 참여 코드: [ ${config.roomCode} ]\n팀원들에게 이 코드를 공유해주세요.`);
-      setRoomConfig(config);
-      setStep('LOGIN');
+    return <HostCreateScreen onComplete={async (config) => {
+      try {
+        const res = await fetch('http://localhost:8000/api/rooms', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(config) // 순수 config(제목, 날짜 등) 전달
+        });
+        
+        if (res.ok) {
+          const data = await res.json();
+          const { roomCode, hostToken } = data; // 백엔드가 생성한 코드와 토큰 받아오기
+          
+          // 💡 방 생성 성공 시, 마스터 키를 로컬 스토리지에 몰래 저장합니다.
+          localStorage.setItem(`hostToken_${roomCode}`, hostToken);
+          setIsHost(true);
+
+          alert(`방이 성공적으로 생성되었습니다!\n🎉 참여 코드: [ ${roomCode} ]\n팀원들에게 이 코드를 공유해주세요.`);
+          
+          setRoomConfig({ ...config, roomCode }); // 프론트엔드 상태에 방 코드 병합
+          setStep('LOGIN');
+        }
+      } catch (err) {
+        alert('방 생성에 실패했습니다. 백엔드 서버를 확인해주세요.');
+      }
     }} />;
   }
 
-  // --- 화면 2: 참여자 로그인 ---
   if (step === 'LOGIN' && roomConfig) {
     return <ParticipantLoginScreen 
       roomTitle={`${roomConfig.title} (코드: ${roomConfig.roomCode})`} 
@@ -55,9 +75,9 @@ export default function ScheduleApp() {
     />;
   }
 
-  // --- 화면 3: 본 투표 그리드 ---
   if (step === 'GRID' && roomConfig && currentUser) {
-    return <DynamicTimeGrid config={roomConfig} currentUser={currentUser} />;
+    // 💡 투표 그리드 컴포넌트에 isHost 권한 정보를 전달합니다.
+    return <DynamicTimeGrid config={roomConfig} currentUser={currentUser} isHost={isHost} />;
   }
 
   return null;

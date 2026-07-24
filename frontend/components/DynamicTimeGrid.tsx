@@ -2,7 +2,7 @@
 
 import React, { useState, useEffect } from 'react';
 import { X, Trash2 } from 'lucide-react';
-import { RoomConfig, User, VoteType, CellData, Comment } from './types'; // 💡 수정됨
+import { RoomConfig, User, VoteType, CellData, Comment } from './types';
 
 function generateDates(start: string, end: string) {
   const dates = [];
@@ -28,7 +28,7 @@ function generateTimes(start: string, end: string, interval: number) {
   return times;
 }
 
-export default function DynamicTimeGrid({ config, currentUser }: { config: RoomConfig, currentUser: User }) {
+export default function DynamicTimeGrid({ config, currentUser, isHost = false }: { config: RoomConfig, currentUser: User, isHost?: boolean }) {
   const [dates, setDates] = useState<string[]>([]);
   const [times, setTimes] = useState<string[]>([]);
   const [selectedVote, setSelectedVote] = useState<VoteType | null>(null);
@@ -40,14 +40,59 @@ export default function DynamicTimeGrid({ config, currentUser }: { config: RoomC
   useEffect(() => {
     setDates(generateDates(config.startDate, config.endDate));
     setTimes(generateTimes(config.startTime, config.endTime, config.interval));
+
+    fetch(`http://localhost:8000/api/rooms/${config.roomCode}/schedule`)
+      .then(res => res.json())
+      .then(data => {
+        if (data.cells) setCells(data.cells);
+      })
+      .catch(err => console.error("데이터 로드 실패:", err));
   }, [config]);
 
-  const handleSaveToServer = () => {
+  const handleSaveToServer = async () => {
     setIsSaving(true);
-    setTimeout(() => {
-      alert(`[서버 저장 시뮬레이션]\n${currentUser.name}님의 투표가 저장되었습니다!`);
+    try {
+      const res = await fetch(`http://localhost:8000/api/rooms/${config.roomCode}/schedule`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ cells })
+      });
+      if (res.ok) alert(`${currentUser.name}님의 투표가 서버에 저장되었습니다!`);
+    } catch (err) {
+      alert('저장에 실패했습니다.');
+    } finally {
       setIsSaving(false);
-    }, 800);
+    }
+  };
+
+  // 💡 방 마감(삭제) 처리 함수
+  const handleCloseRoom = async () => {
+    const confirmDelete = window.confirm('정말로 방을 마감(삭제)하시겠습니까?\n투표된 모든 데이터가 영구적으로 삭제됩니다.');
+    if (!confirmDelete) return;
+
+    // 로컬 스토리지에서 마스터 키 확인
+    const hostToken = localStorage.getItem(`hostToken_${config.roomCode}`);
+    if (!hostToken) return alert('방장 권한(마스터 키)이 없습니다.');
+
+    try {
+      const res = await fetch(`http://localhost:8000/api/rooms/${config.roomCode}`, {
+        method: 'DELETE',
+        headers: {
+          'X-Host-Token': hostToken // 💡 백엔드로 토큰 전송
+        }
+      });
+
+      if (res.ok) {
+        alert('방이 성공적으로 마감(삭제)되었습니다. 홈 화면으로 이동합니다.');
+        localStorage.removeItem(`hostToken_${config.roomCode}`); // 내 브라우저에서 토큰 폐기
+        window.location.href = '/'; // 💡 홈 화면으로 튕겨내기
+      } else {
+        const errorData = await res.json();
+        alert(errorData.detail || '방 마감에 실패했습니다.');
+      }
+    } catch (err) {
+      alert('서버와 통신하는 중 오류가 발생했습니다.');
+    }
   };
 
   const getCellKey = (date: string, time: string) => `${date}-${time}`;
@@ -91,15 +136,31 @@ export default function DynamicTimeGrid({ config, currentUser }: { config: RoomC
 
   return (
     <div className="max-w-md mx-auto min-h-screen relative bg-white shadow-xl overflow-hidden pb-24 flex flex-col font-sans">
+      
+      {/* 💡 헤더 업데이트: 방장 배지 및 방 마감 버튼 연결 */}
       <header className="bg-white px-5 py-4 shadow-sm z-10 flex justify-between items-center border-b border-gray-100">
         <div className="flex flex-col">
-          <h1 className="text-lg font-bold text-gray-900 truncate max-w-[200px]">{config.title}</h1>
+          <div className="flex items-center gap-2">
+            <h1 className="text-lg font-bold text-gray-900 truncate max-w-[200px]">{config.title}</h1>
+            {isHost && <span className="bg-red-100 text-red-600 text-[10px] font-bold px-2 py-0.5 rounded-full">방장</span>}
+          </div>
           <p className="text-xs text-blue-600 font-bold mt-1">접속자: {currentUser.name}</p>
         </div>
-        <button onClick={handleSaveToServer} disabled={isSaving} className="bg-black text-white px-4 py-2 rounded-lg text-sm font-bold active:scale-95 transition-transform">
-          {isSaving ? '저장 중...' : '저장하기'}
-        </button>
+        <div className="flex gap-2">
+          {isHost && (
+            <button 
+              onClick={handleCloseRoom} 
+              className="bg-red-50 text-red-600 border border-red-200 px-3 py-2 rounded-lg text-sm font-bold hover:bg-red-100 transition-colors"
+            >
+              방 마감
+            </button>
+          )}
+          <button onClick={handleSaveToServer} disabled={isSaving} className="bg-black text-white px-4 py-2 rounded-lg text-sm font-bold active:scale-95 transition-transform">
+            {isSaving ? '저장 중...' : '저장하기'}
+          </button>
+        </div>
       </header>
+
       <div className="flex-1 overflow-x-auto select-none bg-gray-50">
         <div className="flex p-4 min-w-max">
           <div className="flex flex-col mr-2 pt-8">
@@ -121,6 +182,7 @@ export default function DynamicTimeGrid({ config, currentUser }: { config: RoomC
           ))}
         </div>
       </div>
+      
       <div className="absolute bottom-0 left-0 right-0 p-4 bg-gradient-to-t from-white via-white to-transparent z-10">
         <div className="bg-white p-2 rounded-2xl shadow-[0_-4px_20px_rgba(0,0,0,0.1)] flex gap-2 border border-gray-100">
           <button onClick={() => setSelectedVote(prev => prev === 'BEST' ? null : 'BEST')} className={`flex-1 py-3 rounded-xl font-bold text-sm transition-all ${selectedVote === 'BEST' ? 'bg-blue-500 text-white shadow-md' : 'bg-blue-50 text-blue-600'}`}>최적</button>
@@ -128,6 +190,7 @@ export default function DynamicTimeGrid({ config, currentUser }: { config: RoomC
           <button onClick={() => setSelectedVote(prev => prev === 'IMPOSSIBLE' ? null : 'IMPOSSIBLE')} className={`flex-1 py-3 rounded-xl font-bold text-sm transition-all ${selectedVote === 'IMPOSSIBLE' ? 'bg-red-500 text-white shadow-md' : 'bg-red-50 text-red-600'}`}>불가</button>
         </div>
       </div>
+      
       <div className={`absolute inset-0 bg-black/50 z-20 transition-opacity duration-300 ${activeCellKey ? 'opacity-100 pointer-events-auto' : 'opacity-0 pointer-events-none'}`} onClick={() => setActiveCellKey(null)} />
       <div className={`absolute bottom-0 left-0 right-0 bg-white rounded-t-3xl z-30 px-6 pt-3 pb-8 flex flex-col shadow-2xl transition-transform duration-300 ease-out h-[65vh] max-w-md mx-auto ${activeCellKey ? 'translate-y-0' : 'translate-y-full'}`}>
         <div className="w-12 h-1.5 bg-gray-300 rounded-full mx-auto mb-6" />

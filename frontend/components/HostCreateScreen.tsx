@@ -4,7 +4,8 @@ import React, { useState } from 'react';
 import { Calendar, Clock, ArrowRight } from 'lucide-react';
 import { RoomConfig } from './types';
 
-export default function HostCreateScreen({ onComplete }: { onComplete: (config: RoomConfig) => void }) {
+// 💡 방 코드는 백엔드가 만들어주므로 Omit으로 제외(방 생성 시점에는 코드 없음)
+export default function HostCreateScreen({ onComplete }: { onComplete: (config: Omit<RoomConfig, 'roomCode'>) => void }) {
   const [title, setTitle] = useState('');
   const [startDate, setStartDate] = useState('');
   const [endDate, setEndDate] = useState('');
@@ -16,10 +17,8 @@ export default function HostCreateScreen({ onComplete }: { onComplete: (config: 
     if (!title || !startDate || !endDate) return alert('모든 항목을 입력해주세요!');
     if (new Date(startDate) > new Date(endDate)) return alert('종료일이 시작일보다 빠를 수 없습니다.');
     
-    // 💡 6자리 랜덤 고유 방 코드 생성 로직 추가!
-    const randomCode = Math.random().toString(36).substring(2, 8).toUpperCase();
-    
-    onComplete({ roomCode: randomCode, title, startDate, endDate, startTime, endTime, interval });
+    // 백엔드로 순수 설정 데이터만 넘깁니다.
+    onComplete({ title, startDate, endDate, startTime, endTime, interval });
   };
 
   return (
