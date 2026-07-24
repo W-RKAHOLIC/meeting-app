@@ -1,29 +1,29 @@
 'use client'
 
-import React, { useState, useEffect, useRef } from 'react';
+import React, { useState, useEffect } from 'react';
 import { MessageCircle, X, Edit2, Trash2 } from 'lucide-react';
 
-// --- 타입 정의 (기존 로직 유지) ---
+// --- 타입 정의 ---
 type VoteType = 'BEST' | 'POSSIBLE' | 'IMPOSSIBLE';
 interface Comment { id: string; text: string; }
-interface CellData { state: VoteType; comments: Comment[]; }
+// 상태가 null일 수 있도록 허용 (코멘트만 달린 경우를 위해)
+interface CellData { state: VoteType | null; comments: Comment[]; }
 
 const DATES = ['7/20(목)', '7/21(금)', '7/22(토)', '7/23(일)'];
 const TIMES = ['09:00', '10:00', '11:00', '12:00', '13:00', '14:00', '15:00', '16:00', '17:00', '18:00'];
 
 export default function TimeGrid() {
-  // --- 상태 관리 (기존 로직 유지) ---
+  // --- 상태 관리 ---
   const [selectedVote, setSelectedVote] = useState<VoteType | null>(null);
   const [cells, setCells] = useState<Record<string, CellData>>({});
   const [activeCellKey, setActiveCellKey] = useState<string | null>(null);
   
-  // 코멘트 관련 상태
   const [commentInput, setCommentInput] = useState('');
   const [editingCommentId, setEditingCommentId] = useState<string | null>(null);
   const [editInputValue, setEditInputValue] = useState('');
   const [isSaving, setIsSaving] = useState(false);
 
-  // --- API 통신 로직 (기존 로직 완벽 이식) ---
+  // --- API 통신 로직 ---
   useEffect(() => {
     fetch('http://localhost:8000/api/schedule')
       .then(res => res.json())
@@ -51,7 +51,7 @@ export default function TimeGrid() {
     }
   };
 
-  // --- 셀 상호작용 및 코멘트 로직 (기존 로직 유지 + 새 UI 연동) ---
+  // --- 셀 상호작용 및 코멘트 로직 ---
   const getCellKey = (date: string, time: string) => `${date}-${time}`;
 
   const handleCellClick = (date: string, time: string) => {
@@ -59,19 +59,26 @@ export default function TimeGrid() {
     const cell = cells[key];
 
     if (selectedVote) {
-      // 투표 모드일 때: 색칠하거나 지우기
+      // 투표 모드일 때
       if (cell && cell.state === selectedVote) {
-        const newCells = { ...cells };
-        delete newCells[key];
-        setCells(newCells);
+        // 이미 칠해진 색을 지울 때, 코멘트가 있으면 상태만 비우고 셀은 유지
+        if (cell.comments.length > 0) {
+          setCells(prev => ({ ...prev, [key]: { ...cell, state: null } }));
+        } else {
+          // 코멘트도 없으면 아예 셀 삭제
+          const newCells = { ...cells };
+          delete newCells[key];
+          setCells(newCells);
+        }
       } else {
+        // 색칠하기
         setCells(prev => ({
           ...prev,
           [key]: { state: selectedVote, comments: cell ? cell.comments : [] },
         }));
       }
     } else {
-      // 투표 툴을 선택하지 않았을 때: 코멘트 바텀 시트 열기
+      // 투표 툴이 없을 때는 코멘트 바텀 시트 열기
       setActiveCellKey(key);
       setEditingCommentId(null);
     }
@@ -83,7 +90,7 @@ export default function TimeGrid() {
     setCells(prev => ({
       ...prev,
       [activeCellKey]: {
-        ...(prev[activeCellKey] || { state: 'POSSIBLE', comments: [] }),
+        state: prev[activeCellKey]?.state || null, // 색칠 강제 추가 없이 기존 상태 유지
         comments: [...(prev[activeCellKey]?.comments || []), newComment],
       },
     }));
@@ -120,23 +127,22 @@ export default function TimeGrid() {
     setEditingCommentId(null);
   };
 
-  // 색상 맵핑 (기존 색상 테마 유지)
+  // 색상 맵핑
   const getVoteColor = (type: VoteType) => {
     switch (type) {
       case 'BEST': return 'bg-blue-500 border-blue-600 text-white';
       case 'POSSIBLE': return 'bg-green-500 border-green-600 text-white';
       case 'IMPOSSIBLE': return 'bg-red-500 border-red-600 text-white';
-      default: return 'bg-gray-50';
+      default: return 'bg-white';
     }
   };
 
   const activeCellData = activeCellKey ? cells[activeCellKey] : null;
 
   return (
-    // 📱 모바일 앱 레이아웃 (새 UI)
     <div className="max-w-md mx-auto min-h-screen relative bg-white shadow-xl overflow-hidden pb-24 font-sans flex flex-col">
       
-      {/* 헤더 및 저장 버튼 (융합) */}
+      {/* 헤더 및 저장 버튼 */}
       <header className="bg-white px-5 py-4 shadow-sm z-10 flex justify-between items-center border-b border-gray-100">
         <div className="flex flex-col">
           <h1 className="text-lg font-bold text-gray-900 tracking-tight">[프로젝트 A] 회의</h1>
@@ -151,10 +157,9 @@ export default function TimeGrid() {
         </button>
       </header>
 
-      {/* 팻 핑거(Fat Finger) 방지 스와이프 그리드 (새 UI) */}
+      {/* 스와이프 그리드 */}
       <div className="flex-1 overflow-x-auto select-none bg-gray-50">
         <div className="flex p-4 min-w-max">
-          {/* 시간 라벨 축 */}
           <div className="flex flex-col mr-2 pt-8">
             {TIMES.map((t) => (
               <div key={t} className="h-12 flex items-center justify-end text-xs font-medium text-gray-400 pr-2">
@@ -163,24 +168,27 @@ export default function TimeGrid() {
             ))}
           </div>
 
-          {/* 날짜별 셀 렌더링 */}
           {DATES.map((d) => (
             <div key={d} className="flex flex-col flex-1 min-w-[70px]">
               <div className="h-8 text-center text-sm font-bold text-gray-700">{d}</div>
               {TIMES.map((t) => {
                 const key = getCellKey(d, t);
                 const cell = cells[key];
+                const hasComments = cell?.comments && cell.comments.length > 0;
+                const bgColor = cell?.state ? getVoteColor(cell.state) : 'bg-white hover:bg-gray-100';
+
                 return (
                   <div 
                     key={key}
                     onClick={() => handleCellClick(d, t)}
-                    className={`w-full h-12 mb-[2px] border-[0.5px] border-gray-200 transition-colors relative cursor-pointer rounded-md mx-[1px]
-                      ${cell ? getVoteColor(cell.state) : 'bg-white hover:bg-gray-100'}
-                    `}
+                    className={`w-full h-12 mb-[2px] border-[0.5px] border-gray-200 transition-colors relative cursor-pointer rounded-md mx-[1px] ${bgColor}`}
                   >
-                    {/* 코멘트 아이콘 표시 로직 (융합) */}
-                    {cell?.comments && cell.comments.length > 0 && (
-                      <MessageCircle className={`absolute top-1 right-1 w-3 h-3 ${cell ? 'text-white' : 'text-blue-500'} drop-shadow-sm`} />
+                    {/* 크고 꽉 찬 말풍선 아이콘 렌더링 */}
+                    {hasComments && (
+                      <MessageCircle 
+                        className={`absolute top-1 right-1 w-4 h-4 drop-shadow-sm ${cell?.state ? 'text-white' : 'text-blue-500'}`} 
+                        fill="currentColor"
+                      />
                     )}
                   </div>
                 );
@@ -190,7 +198,7 @@ export default function TimeGrid() {
         </div>
       </div>
 
-      {/* 하단 고정 가중치 툴킷 (기존 기능 + 새 디자인) */}
+      {/* 하단 고정 가중치 툴킷 */}
       <div className="absolute bottom-0 left-0 right-0 p-4 bg-gradient-to-t from-white via-white to-transparent z-10">
         <p className="text-center text-xs text-gray-500 mb-2 font-medium">
           {selectedVote ? "선택된 버튼을 한 번 더 누르면 펜이 해제됩니다." : "색칠할 투표 버튼을 누르거나 빈칸을 눌러 코멘트를 다세요."}
@@ -229,7 +237,7 @@ export default function TimeGrid() {
         onClick={() => setActiveCellKey(null)}
       />
 
-      {/* 바텀 시트 코멘트 창 (기존 로직 + 새 애니메이션 UI) */}
+      {/* 바텀 시트 코멘트 창 */}
       <div className={`absolute bottom-0 left-0 right-0 bg-white rounded-t-3xl z-30 px-6 pt-3 pb-8 flex flex-col shadow-2xl transition-transform duration-300 ease-out h-[65vh] max-w-md mx-auto ${activeCellKey ? 'translate-y-0' : 'translate-y-full'}`}>
         <div className="w-12 h-1.5 bg-gray-300 rounded-full mx-auto mb-6" />
         
