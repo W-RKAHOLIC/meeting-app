@@ -6,7 +6,8 @@ from datetime import datetime, timedelta
 # 기능 1: 고유 방 코드 생성 (중복 방지)
 def generate_unique_room_code(cursor):
     while True:
-        code = ''.join(random.choices(string.ascii_UPPERCASE + string.digits, k=6))
+        # 💡 ascii_UPPERCASE -> ascii_uppercase 로 오타 수정!
+        code = ''.join(random.choices(string.ascii_uppercase + string.digits, k=6))
         cursor.execute("SELECT 1 FROM rooms WHERE room_code = %s", (code,))
         if not cursor.fetchone():
             return code
