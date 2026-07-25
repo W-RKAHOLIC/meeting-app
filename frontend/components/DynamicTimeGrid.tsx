@@ -52,7 +52,7 @@ export default function DynamicTimeGrid({ config, currentUser, isHost = false }:
   const handleSaveToServer = async () => {
     setIsSaving(true);
     try {
-      const res = await fetch(`http://localhost:8000/api/rooms/${config.roomCode}/schedule`, {
+      const res = await fetch(`172.20.10.3/api/rooms/${config.roomCode}/schedule`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ cells })
@@ -75,7 +75,7 @@ export default function DynamicTimeGrid({ config, currentUser, isHost = false }:
     if (!hostToken) return alert('방장 권한(마스터 키)이 없습니다.');
 
     try {
-      const res = await fetch(`http://localhost:8000/api/rooms/${config.roomCode}`, {
+      const res = await fetch(`172.20.10.3/api/rooms/${config.roomCode}`, {
         method: 'DELETE',
         headers: {
           'X-Host-Token': hostToken // 💡 백엔드로 토큰 전송

@@ -18,7 +18,7 @@ export default function ScheduleApp() {
       onCreate={() => setStep('CREATE')} 
       onJoin={async (code) => {
         try {
-          const res = await fetch(`http://localhost:8000/api/rooms/${code}`);
+          const res = await fetch(`172.20.10.3/rooms/${code}`);
           if (!res.ok) throw new Error('방을 찾을 수 없습니다. 코드를 확인해주세요.');
           
           const data = await res.json();
@@ -40,7 +40,7 @@ export default function ScheduleApp() {
   if (step === 'CREATE') {
     return <HostCreateScreen onComplete={async (config) => {
       try {
-        const res = await fetch('http://localhost:8000/api/rooms', {
+        const res = await fetch('172.20.10.3/api/rooms', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify(config) // 순수 config 전달
