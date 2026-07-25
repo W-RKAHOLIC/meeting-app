@@ -41,7 +41,7 @@ export default function DynamicTimeGrid({ config, currentUser, isHost = false }:
     setDates(generateDates(config.startDate, config.endDate));
     setTimes(generateTimes(config.startTime, config.endTime, config.interval));
 
-    fetch(`http://localhost:8000/api/rooms/${config.roomCode}/schedule`)
+    fetch(`172.20.10.3/api/rooms/${config.roomCode}/schedule`)
       .then(res => res.json())
       .then(data => {
         if (data.cells) setCells(data.cells);
