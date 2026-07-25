@@ -1,4 +1,5 @@
 import json
+import traceback
 from datetime import datetime
 from fastapi import FastAPI, HTTPException, Header
 from fastapi.middleware.cors import CORSMiddleware
@@ -35,7 +36,8 @@ def create_room(config: RoomConfigReq):
         host_token = services.generate_host_token()
         expires_at = services.calculate_expiration_date(config.endDate)
         
-        config_json = json.dumps(config.model_dump())
+        # 💡 Pydantic 버전 충돌 방지: model_dump() 대신 dict() 사용
+        config_json = json.dumps(config.dict()) 
         schedule_json = json.dumps({}) 
         
         cursor.execute("""
@@ -46,6 +48,8 @@ def create_room(config: RoomConfigReq):
         conn.commit()
         return {"status": "success", "roomCode": room_code, "hostToken": host_token}
     except Exception as e:
+        # 💡 에러 발생 시 백엔드 터미널에 상세 원인 출력
+        traceback.print_exc() 
         raise HTTPException(status_code=500, detail=str(e))
     finally:
         cursor.close()
@@ -111,7 +115,7 @@ def update_schedule(room_code: str, req: ScheduleRequest):
         cursor.close()
         conn.close()
 
-# 💡 5. 방 마감(삭제) API - 마스터 키 검증 로직 포함
+# 5. 방 마감(삭제) API - 마스터 키 검증 로직 포함
 @app.delete("/api/rooms/{room_code}")
 def delete_room(room_code: str, x_host_token: str = Header(None)):
     if not x_host_token:
