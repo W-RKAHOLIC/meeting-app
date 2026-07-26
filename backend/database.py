@@ -1,7 +1,7 @@
 import psycopg2
 
 # 선생님의 Supabase 주소
-DB_URL = "postgresql://postgres:zapping1234!@db.vorafaavxcziayxapppi.supabase.co:5432/postgres"
+DB_URL = "os.getenv('DATABASE_URL')"
 
 def get_db_connection():
     return psycopg2.connect(DB_URL)
