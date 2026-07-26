@@ -1,3 +1,4 @@
+import os
 import psycopg2
 
 # 선생님의 Supabase 주소
