@@ -7,24 +7,27 @@ import ParticipantLoginScreen from '../components/ParticipantLoginScreen';
 import DynamicTimeGrid from '../components/DynamicTimeGrid';
 import { Step, RoomConfig, User } from '../components/types';
 
+// 💡 백엔드 라이브 서버 주소를 상수로 빼서 관리합니다.
+const API_BASE_URL = 'https://meeting-app-dade.onrender.com/api/rooms';
+
 export default function ScheduleApp() {
   const [step, setStep] = useState<Step>('HOME');
   const [roomConfig, setRoomConfig] = useState<RoomConfig | null>(null);
   const [currentUser, setCurrentUser] = useState<User | null>(null);
-  const [isHost, setIsHost] = useState(false); // 방장 여부 상태 추가
+  const [isHost, setIsHost] = useState(false);
 
   if (step === 'HOME') {
     return <HomeScreen 
       onCreate={() => setStep('CREATE')} 
       onJoin={async (code) => {
         try {
-          const res = await fetch(`172.20.10.3/rooms/${code}`);
+          // 💡 수정됨: Render 라이브 주소 적용
+          const res = await fetch(`${API_BASE_URL}/${code}`);
           if (!res.ok) throw new Error('방을 찾을 수 없습니다. 코드를 확인해주세요.');
           
           const data = await res.json();
           setRoomConfig(data);
           
-          // 입장 시 내 브라우저에 이 방의 마스터 키가 있는지 확인
           const savedToken = localStorage.getItem(`hostToken_${code}`);
           if (savedToken) setIsHost(true);
           else setIsHost(false);
@@ -40,17 +43,17 @@ export default function ScheduleApp() {
   if (step === 'CREATE') {
     return <HostCreateScreen onComplete={async (config) => {
       try {
-        const res = await fetch('172.20.10.3/api/rooms', {
+        // 💡 수정됨: Render 라이브 주소 적용
+        const res = await fetch(API_BASE_URL, {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify(config) // 순수 config 전달
+          body: JSON.stringify(config) 
         });
         
         if (res.ok) {
           const data = await res.json();
-          const { roomCode, hostToken } = data; // 백엔드가 생성한 코드와 토큰
+          const { roomCode, hostToken } = data; 
           
-          // 방 생성 성공 시, 마스터 키를 로컬 스토리지에 저장
           localStorage.setItem(`hostToken_${roomCode}`, hostToken);
           setIsHost(true);
 
@@ -59,7 +62,6 @@ export default function ScheduleApp() {
           setRoomConfig({ ...config, roomCode });
           setStep('LOGIN');
         } else {
-          // 💡 에러 발생 시 경고창 띄우기
           const errorData = await res.json();
           alert(`방 생성 실패: ${errorData.detail}`);
         }
@@ -80,7 +82,6 @@ export default function ScheduleApp() {
   }
 
   if (step === 'GRID' && roomConfig && currentUser) {
-    // 투표 그리드 컴포넌트에 isHost 권한 정보를 전달
     return <DynamicTimeGrid config={roomConfig} currentUser={currentUser} isHost={isHost} />;
   }
 
