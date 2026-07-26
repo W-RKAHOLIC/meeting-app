@@ -44,7 +44,6 @@ export default function DynamicTimeGrid({ config, currentUser, isHost = false }:
     setDates(generateDates(config.startDate, config.endDate));
     setTimes(generateTimes(config.startTime, config.endTime, config.interval));
 
-    // 💡 Render 라이브 서버 주소 적용
     fetch(`${API_BASE_URL}/${config.roomCode}/schedule`)
       .then(res => res.json())
       .then(data => {
@@ -56,7 +55,6 @@ export default function DynamicTimeGrid({ config, currentUser, isHost = false }:
   const handleSaveToServer = async () => {
     setIsSaving(true);
     try {
-      // 💡 Render 라이브 서버 주소 적용
       const res = await fetch(`${API_BASE_URL}/${config.roomCode}/schedule`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -78,7 +76,6 @@ export default function DynamicTimeGrid({ config, currentUser, isHost = false }:
     if (!hostToken) return alert('방장 권한(마스터 키)이 없습니다.');
 
     try {
-      // 💡 Render 라이브 서버 주소 적용
       const res = await fetch(`${API_BASE_URL}/${config.roomCode}`, {
         method: 'DELETE',
         headers: {
@@ -144,10 +141,18 @@ export default function DynamicTimeGrid({ config, currentUser, isHost = false }:
       <header className="bg-white px-5 py-4 shadow-sm z-10 flex justify-between items-center border-b border-gray-100">
         <div className="flex flex-col">
           <div className="flex items-center gap-2">
-            <h1 className="text-lg font-bold text-gray-900 truncate max-w-[200px]">{config.title}</h1>
+            <h1 className="text-lg font-bold text-gray-900 truncate max-w-[180px]">{config.title}</h1>
             {isHost && <span className="bg-red-100 text-red-600 text-[10px] font-bold px-2 py-0.5 rounded-full">방장</span>}
           </div>
-          <p className="text-xs text-blue-600 font-bold mt-1">접속자: {currentUser.name}</p>
+          {/* 💡 초대 코드 및 접속자 정보 표시 부분 */}
+          <div className="flex items-center gap-2 mt-1.5">
+            <span className="bg-gray-100 text-gray-600 text-xs px-2 py-0.5 rounded-md border border-gray-200">
+              코드: <strong className="text-gray-900 tracking-wide">{config.roomCode}</strong>
+            </span>
+            <span className="text-xs text-blue-600 font-bold">
+              {currentUser.name}님
+            </span>
+          </div>
         </div>
         <div className="flex gap-2">
           {isHost && (
@@ -159,7 +164,7 @@ export default function DynamicTimeGrid({ config, currentUser, isHost = false }:
             </button>
           )}
           <button onClick={handleSaveToServer} disabled={isSaving} className="bg-black text-white px-4 py-2 rounded-lg text-sm font-bold active:scale-95 transition-transform">
-            {isSaving ? '저장 중...' : '저장하기'}
+            {isSaving ? '저장...' : '저장'}
           </button>
         </div>
       </header>
