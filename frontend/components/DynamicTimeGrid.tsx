@@ -4,6 +4,9 @@ import React, { useState, useEffect } from 'react';
 import { X, Trash2 } from 'lucide-react';
 import { RoomConfig, User, VoteType, CellData, Comment } from './types';
 
+// 백엔드 API 기본 주소 (Render 라이브 서버)
+const API_BASE_URL = 'https://meeting-app-dade.onrender.com/api/rooms';
+
 function generateDates(start: string, end: string) {
   const dates = [];
   let curr = new Date(start);
@@ -41,7 +44,8 @@ export default function DynamicTimeGrid({ config, currentUser, isHost = false }:
     setDates(generateDates(config.startDate, config.endDate));
     setTimes(generateTimes(config.startTime, config.endTime, config.interval));
 
-    fetch(`172.20.10.3/api/rooms/${config.roomCode}/schedule`)
+    // 💡 Render 라이브 서버 주소 적용
+    fetch(`${API_BASE_URL}/${config.roomCode}/schedule`)
       .then(res => res.json())
       .then(data => {
         if (data.cells) setCells(data.cells);
@@ -52,7 +56,8 @@ export default function DynamicTimeGrid({ config, currentUser, isHost = false }:
   const handleSaveToServer = async () => {
     setIsSaving(true);
     try {
-      const res = await fetch(`172.20.10.3/api/rooms/${config.roomCode}/schedule`, {
+      // 💡 Render 라이브 서버 주소 적용
+      const res = await fetch(`${API_BASE_URL}/${config.roomCode}/schedule`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ cells })
@@ -65,27 +70,26 @@ export default function DynamicTimeGrid({ config, currentUser, isHost = false }:
     }
   };
 
-  // 💡 방 마감(삭제) 처리 함수
   const handleCloseRoom = async () => {
     const confirmDelete = window.confirm('정말로 방을 마감(삭제)하시겠습니까?\n투표된 모든 데이터가 영구적으로 삭제됩니다.');
     if (!confirmDelete) return;
 
-    // 로컬 스토리지에서 마스터 키 확인
     const hostToken = localStorage.getItem(`hostToken_${config.roomCode}`);
     if (!hostToken) return alert('방장 권한(마스터 키)이 없습니다.');
 
     try {
-      const res = await fetch(`172.20.10.3/api/rooms/${config.roomCode}`, {
+      // 💡 Render 라이브 서버 주소 적용
+      const res = await fetch(`${API_BASE_URL}/${config.roomCode}`, {
         method: 'DELETE',
         headers: {
-          'X-Host-Token': hostToken // 💡 백엔드로 토큰 전송
+          'X-Host-Token': hostToken
         }
       });
 
       if (res.ok) {
         alert('방이 성공적으로 마감(삭제)되었습니다. 홈 화면으로 이동합니다.');
-        localStorage.removeItem(`hostToken_${config.roomCode}`); // 내 브라우저에서 토큰 폐기
-        window.location.href = '/'; // 💡 홈 화면으로 튕겨내기
+        localStorage.removeItem(`hostToken_${config.roomCode}`);
+        window.location.href = '/'; 
       } else {
         const errorData = await res.json();
         alert(errorData.detail || '방 마감에 실패했습니다.');
@@ -137,7 +141,6 @@ export default function DynamicTimeGrid({ config, currentUser, isHost = false }:
   return (
     <div className="max-w-md mx-auto min-h-screen relative bg-white shadow-xl overflow-hidden pb-24 flex flex-col font-sans">
       
-      {/* 💡 헤더 업데이트: 방장 배지 및 방 마감 버튼 연결 */}
       <header className="bg-white px-5 py-4 shadow-sm z-10 flex justify-between items-center border-b border-gray-100">
         <div className="flex flex-col">
           <div className="flex items-center gap-2">
