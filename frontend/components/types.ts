@@ -23,6 +23,6 @@ export interface Comment {
 }
 
 export interface CellData {
-  state: VoteType | null;
+  votes: Record<string, VoteType>; // 💡 수정됨: { "홍길동": "BEST", "김철수": "POSSIBLE" } 형태로 저장
   comments: Comment[];
 }
