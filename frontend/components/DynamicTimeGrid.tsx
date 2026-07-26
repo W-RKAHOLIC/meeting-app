@@ -98,6 +98,7 @@ export default function DynamicTimeGrid({ config, currentUser, isHost = false }:
 
   const getCellKey = (date: string, time: string) => `${date}-${time}`;
 
+  // 💡 단일 셀 클릭 처리
   const handleCellClick = (date: string, time: string) => {
     const key = getCellKey(date, time);
     const cell = cells[key];
@@ -109,6 +110,67 @@ export default function DynamicTimeGrid({ config, currentUser, isHost = false }:
         setCells(prev => ({ ...prev, [key]: { state: selectedVote, comments: cell ? cell.comments : [] } }));
       }
     } else { setActiveCellKey(key); }
+  };
+
+  // 💡 행/열/전체 대량 투표 업데이트 로직
+  const applyBulkUpdate = (keysToUpdate: string[]) => {
+    if (!selectedVote) return;
+
+    setCells(prev => {
+      const newCells = { ...prev };
+      
+      // 대상 셀들이 모두 현재 선택된 투표 상태와 같은지 확인 (전부 칠해져 있다면 지우기 위함)
+      let allAlreadySelected = true;
+      for (const key of keysToUpdate) {
+        if (!newCells[key] || newCells[key].state !== selectedVote) {
+          allAlreadySelected = false;
+          break;
+        }
+      }
+
+      keysToUpdate.forEach(key => {
+        const cell = newCells[key];
+        if (allAlreadySelected) {
+          // 이미 다 칠해져 있다면 투표 해제
+          if (cell && cell.comments.length > 0) {
+            newCells[key] = { ...cell, state: null };
+          } else {
+            delete newCells[key];
+          }
+        } else {
+          // 칠하기
+          newCells[key] = { state: selectedVote, comments: cell ? cell.comments : [] };
+        }
+      });
+
+      return newCells;
+    });
+  };
+
+  // 열(날짜) 클릭
+  const handleColumnClick = (date: string) => {
+    if (!selectedVote) return;
+    const keys = times.map(t => getCellKey(date, t));
+    applyBulkUpdate(keys);
+  };
+
+  // 행(시간) 클릭
+  const handleRowClick = (time: string) => {
+    if (!selectedVote) return;
+    const keys = dates.map(d => getCellKey(d, time));
+    applyBulkUpdate(keys);
+  };
+
+  // 전체 선택 클릭
+  const handleAllClick = () => {
+    if (!selectedVote) return;
+    const keys: string[] = [];
+    dates.forEach(d => {
+      times.forEach(t => {
+        keys.push(getCellKey(d, t));
+      });
+    });
+    applyBulkUpdate(keys);
   };
 
   const handleAddComment = () => {
@@ -144,7 +206,6 @@ export default function DynamicTimeGrid({ config, currentUser, isHost = false }:
             <h1 className="text-lg font-bold text-gray-900 truncate max-w-[180px]">{config.title}</h1>
             {isHost && <span className="bg-red-100 text-red-600 text-[10px] font-bold px-2 py-0.5 rounded-full">방장</span>}
           </div>
-          {/* 💡 초대 코드 및 접속자 정보 표시 부분 */}
           <div className="flex items-center gap-2 mt-1.5">
             <span className="bg-gray-100 text-gray-600 text-xs px-2 py-0.5 rounded-md border border-gray-200">
               코드: <strong className="text-gray-900 tracking-wide">{config.roomCode}</strong>
@@ -171,12 +232,34 @@ export default function DynamicTimeGrid({ config, currentUser, isHost = false }:
 
       <div className="flex-1 overflow-x-auto select-none bg-gray-50">
         <div className="flex p-4 min-w-max">
-          <div className="flex flex-col mr-2 pt-8">
-            {times.map((t) => <div key={t} className="h-12 flex items-center justify-end text-xs font-medium text-gray-400 pr-2">{t}</div>)}
+          <div className="flex flex-col mr-2">
+            {/* 💡 전체 선택 버튼 추가 */}
+            <div 
+              onClick={handleAllClick}
+              className={`h-8 flex items-center justify-end text-xs font-bold text-gray-400 pr-2 transition-colors rounded-md ${selectedVote ? 'cursor-pointer hover:bg-gray-200 hover:text-blue-600' : ''}`}
+            >
+              {selectedVote ? '전체선택' : ''}
+            </div>
+            {/* 💡 행(시간) 클릭 버튼화 및 레이아웃 정렬(mb-[2px] 추가) */}
+            {times.map((t) => (
+              <div 
+                key={t} 
+                onClick={() => handleRowClick(t)}
+                className={`h-12 mb-[2px] flex items-center justify-end text-xs font-medium text-gray-400 pr-2 transition-colors rounded-md ${selectedVote ? 'cursor-pointer hover:bg-gray-200 hover:text-gray-900' : ''}`}
+              >
+                {t}
+              </div>
+            ))}
           </div>
           {dates.map((d) => (
             <div key={d} className="flex flex-col flex-1 min-w-[70px]">
-              <div className="h-8 text-center text-sm font-bold text-gray-700">{d}</div>
+              {/* 💡 열(날짜) 클릭 버튼화 */}
+              <div 
+                onClick={() => handleColumnClick(d)}
+                className={`h-8 flex items-center justify-center text-sm font-bold text-gray-700 transition-colors rounded-md ${selectedVote ? 'cursor-pointer hover:bg-gray-200 hover:text-blue-600' : ''}`}
+              >
+                {d}
+              </div>
               {times.map((t) => {
                 const key = getCellKey(d, t);
                 const cell = cells[key];
