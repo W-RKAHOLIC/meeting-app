@@ -40,11 +40,9 @@ export default function DynamicTimeGrid({ config, currentUser, isHost = false, o
   const [isSaving, setIsSaving] = useState(false);
   const [viewMode, setViewMode] = useState<'MY' | 'ALL'>('MY');
 
-  // 💡 [드래그 상태 관리] 마우스를 누르고 있는지 여부를 기억합니다.
   const isDragging = useRef(false);
 
   useEffect(() => {
-    // 마우스를 떼거나 터치를 끝내면 드래그 모드 종료
     const stopDrag = () => { isDragging.current = false; };
     window.addEventListener('mouseup', stopDrag);
     window.addEventListener('touchend', stopDrag);
@@ -58,7 +56,6 @@ export default function DynamicTimeGrid({ config, currentUser, isHost = false, o
     setDates(generateDates(config.startDate, config.endDate));
     setTimes(generateTimes(config.startTime, config.endTime, config.interval));
 
-    // 💡 [실시간 동기화] 백엔드에서 조용히 최신 데이터를 가져옵니다.
     const fetchSchedule = async () => {
       try {
         const res = await fetch(`${API_BASE_URL}/${config.roomCode}/schedule`);
@@ -68,18 +65,15 @@ export default function DynamicTimeGrid({ config, currentUser, isHost = false, o
             const newCells: Record<string, CellData> = JSON.parse(JSON.stringify(data.cells));
             const prevCells: Record<string, CellData> = JSON.parse(JSON.stringify(prev));
             
-            // 💡 [핵심 병합 로직] '나의 데이터(수정 중인 상태)'는 유지하고, 남의 데이터만 덮어씁니다!
             const allKeys = new Set([...Object.keys(prevCells), ...Object.keys(newCells)]);
             allKeys.forEach(key => {
               const localCell = prevCells[key] || { votes: {}, comments: [] };
               const serverCell = newCells[key] || { votes: {}, comments: [] };
               
-              // 내 투표 병합 (내가 로컬에서 투표했으면 살리고, 없으면 지움)
               const myLocalVote = localCell.votes?.[currentUser.name];
               if (myLocalVote) serverCell.votes[currentUser.name] = myLocalVote;
               else delete serverCell.votes[currentUser.name];
               
-              // 내 메모 병합
               const myLocalComments = (localCell.comments || []).filter(c => c.author === currentUser.name);
               const otherServerComments = (serverCell.comments || []).filter(c => c.author !== currentUser.name);
               serverCell.comments = [...otherServerComments, ...myLocalComments];
@@ -99,7 +93,6 @@ export default function DynamicTimeGrid({ config, currentUser, isHost = false, o
     };
 
     fetchSchedule();
-    // 💡 10초마다 자동으로 서버에서 최신 데이터를 확인합니다!
     const intervalId = setInterval(fetchSchedule, 10000);
     return () => clearInterval(intervalId);
   }, [config.roomCode, currentUser.name]);
@@ -150,7 +143,6 @@ export default function DynamicTimeGrid({ config, currentUser, isHost = false, o
 
   const getCellKey = (date: string, time: string) => `${date}-${time}`;
 
-  // 💡 [드래그 앤 드롭 시작] 마우스를 누르거나 터치를 시작했을 때
   const handlePointerDown = (key: string) => {
     if (viewMode === 'ALL') { setActiveCellKey(key); return; }
 
@@ -162,13 +154,11 @@ export default function DynamicTimeGrid({ config, currentUser, isHost = false, o
         const currentMyVote = cell.votes[currentUser.name];
         
         if (currentMyVote === selectedVote) {
-          // 이미 같은 투표면 지우기 (토글)
           const newVotes = { ...cell.votes };
           delete newVotes[currentUser.name];
           if (Object.keys(newVotes).length === 0 && cell.comments.length === 0) delete newCells[key];
           else newCells[key] = { ...cell, votes: newVotes };
         } else {
-          // 새로운 투표 칠하기
           newCells[key] = { ...cell, votes: { ...cell.votes, [currentUser.name]: selectedVote } };
         }
         return newCells;
@@ -178,13 +168,11 @@ export default function DynamicTimeGrid({ config, currentUser, isHost = false, o
     }
   };
 
-  // 💡 [드래그 앤 드롭 진행] 누른 채로 다른 칸에 진입했을 때 (마우스 전용)
   const handlePointerEnter = (key: string) => {
     if (isDragging.current && selectedVote && viewMode === 'MY') {
       setCells(prev => {
         const newCells = { ...prev };
         const cell = newCells[key] || { votes: {}, comments: [] };
-        // 드래그 중일 때는 무조건 선택된 색상으로 칠하기만 합니다.
         if (cell.votes[currentUser.name] !== selectedVote) {
           newCells[key] = { ...cell, votes: { ...cell.votes, [currentUser.name]: selectedVote } };
         }
@@ -193,13 +181,12 @@ export default function DynamicTimeGrid({ config, currentUser, isHost = false, o
     }
   };
 
-  // 💡 [터치 스와이프 진행] 스마트폰에서 누른 채로 손가락을 이동할 때
   const handleTouchMove = (e: React.TouchEvent) => {
     if (!isDragging.current || !selectedVote || viewMode === 'ALL') return;
     const touch = e.touches[0];
     const target = document.elementFromPoint(touch.clientX, touch.clientY);
     if (target) {
-      const key = target.getAttribute('data-key'); // 닿은 칸의 열쇠(Key)를 알아냅니다!
+      const key = target.getAttribute('data-key');
       if (key) handlePointerEnter(key);
     }
   };
@@ -283,6 +270,16 @@ export default function DynamicTimeGrid({ config, currentUser, isHost = false, o
     setCells(prev => ({ ...prev, [activeCellKey]: { ...prev[activeCellKey], comments: prev[activeCellKey].comments.filter(c => c.id !== commentId) } }));
   };
 
+  // 💡 [새 기능] 투표 또는 메모를 남긴 전체 참여자 명단 추출
+  const participants = useMemo(() => {
+    const names = new Set<string>();
+    Object.values(cells).forEach(cell => {
+      if (cell.votes) Object.keys(cell.votes).forEach(name => names.add(name));
+      if (cell.comments) cell.comments.forEach(c => names.add(c.author));
+    });
+    return Array.from(names);
+  }, [cells]);
+
   const activeCellData = activeCellKey ? cells[activeCellKey] : null;
   const bestUsers: string[] = [], possibleUsers: string[] = [], impossibleUsers: string[] = [];
   if (activeCellData?.votes) {
@@ -295,7 +292,7 @@ export default function DynamicTimeGrid({ config, currentUser, isHost = false, o
 
   return (
     <div className="max-w-md mx-auto min-h-screen relative bg-white shadow-xl overflow-hidden pb-24 flex flex-col font-sans">
-      <header className="bg-white px-4 py-4 shadow-sm z-10 flex flex-col border-b border-gray-100">
+      <header className="bg-white px-4 py-4 shadow-sm z-10 flex flex-col border-b border-gray-100 transition-all">
         <div className="flex justify-between items-start w-full">
           <div className="flex flex-col">
             <div className="flex items-center gap-1">
@@ -330,9 +327,26 @@ export default function DynamicTimeGrid({ config, currentUser, isHost = false, o
           <button onClick={() => { setViewMode('MY'); setSelectedVote(null); }} className={`flex-1 flex items-center justify-center gap-1 py-2 rounded-lg text-sm font-bold transition-all ${viewMode === 'MY' ? 'bg-white shadow text-black' : 'text-gray-500'}`}>내 투표</button>
           <button onClick={() => { setViewMode('ALL'); setSelectedVote(null); }} className={`flex-1 flex items-center justify-center gap-1 py-2 rounded-lg text-sm font-bold transition-all ${viewMode === 'ALL' ? 'bg-blue-500 shadow text-white' : 'text-gray-500 hover:text-gray-700'}`}><Users className="w-4 h-4" /> 종합 결과</button>
         </div>
+
+        {/* 💡 [새 기능] '종합 결과' 모드일 때만 참여자 명단 스크롤이 나타납니다 */}
+        {viewMode === 'ALL' && (
+          <div className="mt-3 flex items-center gap-2 overflow-x-auto pb-1 scrollbar-hide">
+            <div className="text-xs font-bold text-blue-600 whitespace-nowrap flex items-center gap-1 bg-blue-50 px-2 py-1 rounded-md">
+              <Users className="w-3 h-3" /> 참여자 ({participants.length}명)
+            </div>
+            {participants.length === 0 ? (
+              <span className="text-[11px] text-gray-400">아직 참여한 사람이 없습니다.</span>
+            ) : (
+              participants.map(p => (
+                <span key={p} className="bg-gray-100 text-gray-700 text-[11px] font-bold px-2.5 py-1 rounded-full whitespace-nowrap border border-gray-200">
+                  {p}
+                </span>
+              ))
+            )}
+          </div>
+        )}
       </header>
 
-      {/* 💡 [드래그 최적화] 터치로 칠할 때 화면이 위아래로 스크롤 되는 것을 방지합니다. */}
       <div 
         className="flex-1 overflow-x-auto select-none bg-gray-50" 
         style={{ touchAction: selectedVote && viewMode === 'MY' ? 'none' : 'auto' }}
@@ -366,7 +380,6 @@ export default function DynamicTimeGrid({ config, currentUser, isHost = false, o
                 }
 
                 return (
-                  // 💡 마우스 및 터치 이벤트 연결부
                   <div 
                     key={key} 
                     data-key={key}
