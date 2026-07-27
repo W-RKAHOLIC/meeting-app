@@ -1,8 +1,8 @@
 'use client'
 
 import React, { useState, useEffect, useMemo } from 'react';
-// 💡 Share2 아이콘이 추가되었습니다!
-import { X, Trash2, Users, Share2 } from 'lucide-react'; 
+// 💡 ChevronLeft 아이콘 추가
+import { X, Trash2, Users, Share2, ChevronLeft } from 'lucide-react'; 
 import { RoomConfig, User, VoteType, CellData, Comment } from './types';
 
 const API_BASE_URL = 'https://meeting-app-dade.onrender.com/api/rooms';
@@ -31,7 +31,8 @@ function generateTimes(start: string, end: string, interval: number) {
   return times;
 }
 
-export default function DynamicTimeGrid({ config, currentUser, isHost = false }: { config: RoomConfig, currentUser: User, isHost?: boolean }) {
+// 💡 onBack 프롭 추가
+export default function DynamicTimeGrid({ config, currentUser, isHost = false, onBack }: { config: RoomConfig, currentUser: User, isHost?: boolean, onBack?: () => void }) {
   const [dates, setDates] = useState<string[]>([]);
   const [times, setTimes] = useState<string[]>([]);
   const [selectedVote, setSelectedVote] = useState<VoteType | null>(null);
@@ -64,28 +65,17 @@ export default function DynamicTimeGrid({ config, currentUser, isHost = false }:
       .catch(err => console.error("데이터 로드 실패:", err));
   }, [config]);
 
-  // 💡 [핵심] 공유하기 버튼 클릭 로직
   const handleShare = async () => {
-    // 현재 주소창의 도메인(예: https://xxx.vercel.app)을 가져와서 코드를 붙입니다.
     const shareUrl = `${window.location.origin}/?code=${config.roomCode}`;
     const shareData = {
       title: config.title,
       text: `[${config.title}] 일정 조율에 초대합니다! 참여해주세요 🗓️`,
       url: shareUrl,
     };
-
-    // 폰(모바일 브라우저)이라면 카카오톡/문자 공유 창을 띄웁니다!
     if (navigator.share) {
-      try {
-        await navigator.share(shareData);
-      } catch (err) {
-        console.log('공유 취소됨');
-      }
+      try { await navigator.share(shareData); } catch (err) { console.log('공유 취소됨'); }
     } else {
-      // PC이거나 지원하지 않는 브라우저면 깔끔하게 복사해 줍니다.
-      navigator.clipboard.writeText(shareUrl).then(() => {
-        alert('초대 링크가 복사되었습니다!\n카카오톡 등에 붙여넣기 해주세요.');
-      });
+      navigator.clipboard.writeText(shareUrl).then(() => alert('초대 링크가 복사되었습니다!'));
     }
   };
 
@@ -122,20 +112,16 @@ export default function DynamicTimeGrid({ config, currentUser, isHost = false }:
       });
       if (res.ok) {
         setCells(mergedCells);
-        alert(`${currentUser.name}님의 투표가 서버에 저장되었습니다!`);
+        alert(`${currentUser.name}님의 투표가 저장되었습니다!`);
       }
-    } catch (err) {
-      alert('저장에 실패했습니다.');
-    } finally {
-      setIsSaving(false);
-    }
+    } catch (err) { alert('저장에 실패했습니다.'); } finally { setIsSaving(false); }
   };
 
   const handleCloseRoom = async () => {
     const confirmDelete = window.confirm('정말로 방을 마감하시겠습니까?');
     if (!confirmDelete) return;
     const hostToken = localStorage.getItem(`hostToken_${config.roomCode}`);
-    if (!hostToken) return alert('방장 권한이 없습니다.');
+    if (!hostToken) return alert('권한이 없습니다.');
     try {
       const res = await fetch(`${API_BASE_URL}/${config.roomCode}`, {
         method: 'DELETE',
@@ -155,15 +141,11 @@ export default function DynamicTimeGrid({ config, currentUser, isHost = false }:
     const key = getCellKey(date, time);
     const cell = cells[key] || { votes: {}, comments: [] };
     
-    if (viewMode === 'ALL') {
-      setActiveCellKey(key);
-      return;
-    }
+    if (viewMode === 'ALL') { setActiveCellKey(key); return; }
 
     if (selectedVote) {
       const currentMyVote = cell.votes[currentUser.name];
       const newCells = { ...cells };
-      
       if (currentMyVote === selectedVote) {
         const newVotes = { ...cell.votes };
         delete newVotes[currentUser.name];
@@ -178,17 +160,12 @@ export default function DynamicTimeGrid({ config, currentUser, isHost = false }:
 
   const applyBulkUpdate = (keysToUpdate: string[]) => {
     if (!selectedVote || viewMode === 'ALL') return;
-
     setCells(prev => {
       const newCells = { ...prev };
       let allAlreadySelected = true;
-      
       for (const key of keysToUpdate) {
-        if (newCells[key]?.votes?.[currentUser.name] !== selectedVote) {
-          allAlreadySelected = false; break;
-        }
+        if (newCells[key]?.votes?.[currentUser.name] !== selectedVote) { allAlreadySelected = false; break; }
       }
-
       keysToUpdate.forEach(key => {
         const cell = newCells[key] || { votes: {}, comments: [] };
         if (allAlreadySelected) {
@@ -225,17 +202,13 @@ export default function DynamicTimeGrid({ config, currentUser, isHost = false }:
   const getHeatmapDisplay = (votes: Record<string, VoteType> = {}) => {
     const voters = Object.values(votes);
     if (voters.length === 0) return { bg: 'bg-white', text: '' };
-
     let score = 0;
     voters.forEach(v => {
       if (v === 'BEST') score += 1;
       else if (v === 'POSSIBLE') score += 0.5;
     });
-
     if (score === 0) return { bg: 'bg-gray-100', text: 'text-gray-400' };
-
     const ratio = globalMaxScore > 0 ? score / globalMaxScore : 0;
-
     if (ratio === 1.0) return { bg: 'bg-indigo-900 border-2 border-yellow-400 shadow-md scale-[1.02] z-10', text: 'text-yellow-400 font-black' };
     if (ratio >= 0.7) return { bg: 'bg-indigo-600', text: 'text-white' };
     if (ratio >= 0.4) return { bg: 'bg-blue-500', text: 'text-white' };
@@ -276,32 +249,32 @@ export default function DynamicTimeGrid({ config, currentUser, isHost = false }:
 
   return (
     <div className="max-w-md mx-auto min-h-screen relative bg-white shadow-xl overflow-hidden pb-24 flex flex-col font-sans">
-      
-      <header className="bg-white px-5 py-4 shadow-sm z-10 flex flex-col border-b border-gray-100">
+      <header className="bg-white px-4 py-4 shadow-sm z-10 flex flex-col border-b border-gray-100">
         <div className="flex justify-between items-start w-full">
           <div className="flex flex-col">
-            <div className="flex items-center gap-2">
-              <h1 className="text-lg font-bold text-gray-900 truncate max-w-[180px]">{config.title}</h1>
-              {isHost && <span className="bg-red-100 text-red-600 text-[10px] font-bold px-2 py-0.5 rounded-full">방장</span>}
+            <div className="flex items-center gap-1">
+              {/* 💡 투표 화면 상단 뒤로가기 버튼 */}
+              {onBack && (
+                <button onClick={onBack} className="text-gray-400 hover:text-black p-1 -ml-1 rounded-lg transition-colors active:scale-95">
+                  <ChevronLeft className="w-6 h-6" />
+                </button>
+              )}
+              <h1 className="text-lg font-bold text-gray-900 truncate max-w-[150px] leading-none">{config.title}</h1>
+              {isHost && <span className="bg-red-100 text-red-600 text-[10px] font-bold px-2 py-0.5 rounded-full ml-1">방장</span>}
             </div>
-            <div className="flex items-center gap-2 mt-1.5">
+            <div className="flex items-center gap-2 mt-2 pl-1">
               <span className="bg-gray-100 text-gray-600 text-xs px-2 py-0.5 rounded-md border border-gray-200">코드: <strong className="text-gray-900">{config.roomCode}</strong></span>
               <span className="text-xs text-blue-600 font-bold">{currentUser.name}님</span>
             </div>
           </div>
           <div className="flex gap-2">
-            {/* 💡 공유 버튼 추가 */}
-            <button 
-              onClick={handleShare} 
-              className="bg-blue-50 text-blue-600 border border-blue-200 px-3 py-2 rounded-lg text-sm font-bold flex items-center gap-1 hover:bg-blue-100 transition-colors"
-            >
+            <button onClick={handleShare} className="bg-blue-50 text-blue-600 border border-blue-200 px-3 py-2 rounded-lg text-sm font-bold flex items-center gap-1 hover:bg-blue-100 transition-colors">
               <Share2 className="w-4 h-4" /> 공유
             </button>
             <button onClick={handleSaveToServer} disabled={isSaving} className="bg-black text-white px-4 py-2 rounded-lg text-sm font-bold">{isSaving ? '저장...' : '저장'}</button>
           </div>
         </div>
         
-        {/* 방장 마감 버튼은 공간 확보를 위해 아래로 이동 */}
         {isHost && (
           <div className="mt-3 flex justify-end">
             <button onClick={handleCloseRoom} className="text-red-500 text-xs font-bold underline hover:text-red-700">방 마감하기</button>
@@ -309,36 +282,26 @@ export default function DynamicTimeGrid({ config, currentUser, isHost = false }:
         )}
         
         <div className="flex bg-gray-100 p-1 rounded-xl mt-4 border border-gray-200">
-          <button onClick={() => { setViewMode('MY'); setSelectedVote(null); }} className={`flex-1 flex items-center justify-center gap-1 py-2 rounded-lg text-sm font-bold transition-all ${viewMode === 'MY' ? 'bg-white shadow text-black' : 'text-gray-500'}`}>
-            내 투표
-          </button>
-          <button onClick={() => { setViewMode('ALL'); setSelectedVote(null); }} className={`flex-1 flex items-center justify-center gap-1 py-2 rounded-lg text-sm font-bold transition-all ${viewMode === 'ALL' ? 'bg-blue-500 shadow text-white' : 'text-gray-500 hover:text-gray-700'}`}>
-            <Users className="w-4 h-4" /> 종합 결과
-          </button>
+          <button onClick={() => { setViewMode('MY'); setSelectedVote(null); }} className={`flex-1 flex items-center justify-center gap-1 py-2 rounded-lg text-sm font-bold transition-all ${viewMode === 'MY' ? 'bg-white shadow text-black' : 'text-gray-500'}`}>내 투표</button>
+          <button onClick={() => { setViewMode('ALL'); setSelectedVote(null); }} className={`flex-1 flex items-center justify-center gap-1 py-2 rounded-lg text-sm font-bold transition-all ${viewMode === 'ALL' ? 'bg-blue-500 shadow text-white' : 'text-gray-500 hover:text-gray-700'}`}><Users className="w-4 h-4" /> 종합 결과</button>
         </div>
       </header>
 
+      {/* --- 이하 그리드 및 상세 모달 코드는 기존과 완벽히 동일하므로 생략 없이 렌더링 됩니다 --- */}
       <div className="flex-1 overflow-x-auto select-none bg-gray-50">
         <div className="flex p-4 min-w-max">
           <div className="flex flex-col mr-2">
-            <div onClick={handleAllClick} className={`h-8 flex items-center justify-end text-xs font-bold text-gray-400 pr-2 rounded-md ${selectedVote && viewMode === 'MY' ? 'cursor-pointer hover:bg-gray-200 hover:text-blue-600' : ''}`}>
-              {selectedVote && viewMode === 'MY' ? '전체선택' : ''}
-            </div>
+            <div onClick={handleAllClick} className={`h-8 flex items-center justify-end text-xs font-bold text-gray-400 pr-2 rounded-md ${selectedVote && viewMode === 'MY' ? 'cursor-pointer hover:bg-gray-200 hover:text-blue-600' : ''}`}>{selectedVote && viewMode === 'MY' ? '전체선택' : ''}</div>
             {times.map((t) => (
-              <div key={t} onClick={() => handleRowClick(t)} className={`h-12 mb-[2px] flex items-center justify-end text-xs font-medium text-gray-400 pr-2 rounded-md ${selectedVote && viewMode === 'MY' ? 'cursor-pointer hover:bg-gray-200 hover:text-gray-900' : ''}`}>
-                {t}
-              </div>
+              <div key={t} onClick={() => handleRowClick(t)} className={`h-12 mb-[2px] flex items-center justify-end text-xs font-medium text-gray-400 pr-2 rounded-md ${selectedVote && viewMode === 'MY' ? 'cursor-pointer hover:bg-gray-200 hover:text-gray-900' : ''}`}>{t}</div>
             ))}
           </div>
           {dates.map((d) => (
             <div key={d} className="flex flex-col flex-1 min-w-[70px]">
-              <div onClick={() => handleColumnClick(d)} className={`h-8 flex items-center justify-center text-sm font-bold text-gray-700 rounded-md ${selectedVote && viewMode === 'MY' ? 'cursor-pointer hover:bg-gray-200 hover:text-blue-600' : ''}`}>
-                {d}
-              </div>
+              <div onClick={() => handleColumnClick(d)} className={`h-8 flex items-center justify-center text-sm font-bold text-gray-700 rounded-md ${selectedVote && viewMode === 'MY' ? 'cursor-pointer hover:bg-gray-200 hover:text-blue-600' : ''}`}>{d}</div>
               {times.map((t) => {
                 const key = getCellKey(d, t);
                 const cell = cells[key];
-                
                 let cellClasses = 'w-full h-12 mb-[2px] border-[0.5px] border-gray-200 transition-all duration-200 relative cursor-pointer rounded-md mx-[1px] flex items-center justify-center';
                 let textColor = '';
                 let displayCount = 0;
@@ -384,41 +347,24 @@ export default function DynamicTimeGrid({ config, currentUser, isHost = false }:
 
         <div className="flex-1 overflow-y-auto pr-2 flex flex-col gap-4">
           <div className="flex gap-2">
-             <div className="flex-1 bg-blue-50 p-3 rounded-xl border border-blue-100">
-               <span className="text-xs font-bold text-blue-600 block mb-1">최적 ({bestUsers.length})</span>
-               <span className="text-sm text-gray-700 leading-tight">{bestUsers.join(', ') || '-'}</span>
-             </div>
-             <div className="flex-1 bg-green-50 p-3 rounded-xl border border-green-100">
-               <span className="text-xs font-bold text-green-600 block mb-1">가능 ({possibleUsers.length})</span>
-               <span className="text-sm text-gray-700 leading-tight">{possibleUsers.join(', ') || '-'}</span>
-             </div>
-             <div className="flex-1 bg-red-50 p-3 rounded-xl border border-red-100">
-               <span className="text-xs font-bold text-red-600 block mb-1">불가 ({impossibleUsers.length})</span>
-               <span className="text-sm text-gray-700 leading-tight">{impossibleUsers.join(', ') || '-'}</span>
-             </div>
+             <div className="flex-1 bg-blue-50 p-3 rounded-xl border border-blue-100"><span className="text-xs font-bold text-blue-600 block mb-1">최적 ({bestUsers.length})</span><span className="text-sm text-gray-700 leading-tight">{bestUsers.join(', ') || '-'}</span></div>
+             <div className="flex-1 bg-green-50 p-3 rounded-xl border border-green-100"><span className="text-xs font-bold text-green-600 block mb-1">가능 ({possibleUsers.length})</span><span className="text-sm text-gray-700 leading-tight">{possibleUsers.join(', ') || '-'}</span></div>
+             <div className="flex-1 bg-red-50 p-3 rounded-xl border border-red-100"><span className="text-xs font-bold text-red-600 block mb-1">불가 ({impossibleUsers.length})</span><span className="text-sm text-gray-700 leading-tight">{impossibleUsers.join(', ') || '-'}</span></div>
           </div>
-
           <div className="h-px bg-gray-100 my-2" />
-
           <div className="flex flex-col gap-3">
             {!activeCellData?.comments || activeCellData.comments.length === 0 ? (
               <div className="py-8 flex items-center justify-center text-sm text-gray-400 bg-gray-50 rounded-2xl">아직 작성된 메모가 없습니다.</div>
             ) : (
               activeCellData.comments.map((comment) => (
                 <div key={comment.id} className="bg-gray-50 p-4 rounded-2xl text-sm flex justify-between border border-gray-100">
-                  <div className="flex flex-col gap-1">
-                    <span className="font-bold text-blue-600 text-xs">{comment.author}</span>
-                    <span className="text-gray-800 leading-relaxed">{comment.text}</span>
-                  </div>
-                  {comment.author === currentUser.name && (
-                    <button onClick={() => handleDeleteComment(comment.id, comment.author)} className="text-gray-400 hover:text-red-500 ml-4"><Trash2 className="w-4 h-4" /></button>
-                  )}
+                  <div className="flex flex-col gap-1"><span className="font-bold text-blue-600 text-xs">{comment.author}</span><span className="text-gray-800 leading-relaxed">{comment.text}</span></div>
+                  {comment.author === currentUser.name && <button onClick={() => handleDeleteComment(comment.id, comment.author)} className="text-gray-400 hover:text-red-500 ml-4"><Trash2 className="w-4 h-4" /></button>}
                 </div>
               ))
             )}
           </div>
         </div>
-        
         <div className="flex gap-2 pt-4 border-t border-gray-100 mt-2">
           <input type="text" value={commentInput} onChange={(e) => setCommentInput(e.target.value)} onKeyDown={(e) => e.key === 'Enter' && handleAddComment()} placeholder="메모를 입력하세요" className="flex-1 bg-gray-100 border-none rounded-xl px-4 py-3 text-sm focus:outline-none focus:ring-2 focus:ring-black" />
           <button onClick={handleAddComment} className="bg-black text-white px-5 py-3 rounded-xl font-bold text-sm">등록</button>

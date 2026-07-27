@@ -15,7 +15,6 @@ export default function ScheduleApp() {
   const [currentUser, setCurrentUser] = useState<User | null>(null);
   const [isHost, setIsHost] = useState(false);
 
-  // 💡 [핵심] 누군가 링크(?code=...)를 타고 들어왔을 때 자동 입장시키는 로직
   useEffect(() => {
     const params = new URLSearchParams(window.location.search);
     const code = params.get('code');
@@ -35,57 +34,64 @@ export default function ScheduleApp() {
       const savedToken = localStorage.getItem(`hostToken_${code}`);
       setIsHost(!!savedToken);
 
-      // 주소창을 깔끔하게 공유용 링크로 덮어쓰기
       window.history.pushState(null, '', `/?code=${code}`);
       setStep('LOGIN');
     } catch (err: any) {
       alert(err.message);
-      window.history.replaceState(null, '', '/'); // 실패 시 홈 주소로 복구
+      window.history.replaceState(null, '', '/');
     }
   };
 
   if (step === 'HOME') {
     return <HomeScreen 
       onCreate={() => setStep('CREATE')} 
-      onJoin={handleJoin} // 💡 수정된 입장 로직 연결
+      onJoin={handleJoin} 
     />;
   }
 
   if (step === 'CREATE') {
-    return <HostCreateScreen onComplete={async (config) => {
-      try {
-        const res = await fetch(API_BASE_URL, {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify(config) 
-        });
-        
-        if (res.ok) {
-          const data = await res.json();
-          const { roomCode, hostToken } = data; 
+    return <HostCreateScreen 
+      // 💡 [추가됨] 방 생성 중 뒤로가기
+      onBack={() => setStep('HOME')} 
+      onComplete={async (config) => {
+        try {
+          const res = await fetch(API_BASE_URL, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify(config) 
+          });
           
-          localStorage.setItem(`hostToken_${roomCode}`, hostToken);
-          setIsHost(true);
+          if (res.ok) {
+            const data = await res.json();
+            const { roomCode, hostToken } = data; 
+            
+            localStorage.setItem(`hostToken_${roomCode}`, hostToken);
+            setIsHost(true);
 
-          alert(`방이 성공적으로 생성되었습니다!\n팀원들에게 링크를 공유해주세요.`);
-          
-          setRoomConfig({ ...config, roomCode });
-          // 방 생성 직후 주소창에 내 방 링크 박제!
-          window.history.pushState(null, '', `/?code=${roomCode}`);
-          setStep('LOGIN');
-        } else {
-          const errorData = await res.json();
-          alert(`방 생성 실패: ${errorData.detail}`);
+            alert(`방이 성공적으로 생성되었습니다!\n팀원들에게 링크를 공유해주세요.`);
+            
+            setRoomConfig({ ...config, roomCode });
+            window.history.pushState(null, '', `/?code=${roomCode}`);
+            setStep('LOGIN');
+          } else {
+            const errorData = await res.json();
+            alert(`방 생성 실패: ${errorData.detail}`);
+          }
+        } catch (err) {
+          alert('백엔드 서버와 통신할 수 없습니다.');
         }
-      } catch (err) {
-        alert('백엔드 서버와 통신할 수 없습니다.');
-      }
-    }} />;
+      }} 
+    />;
   }
 
   if (step === 'LOGIN' && roomConfig) {
     return <ParticipantLoginScreen 
       roomTitle={`${roomConfig.title} (코드: ${roomConfig.roomCode})`} 
+      // 💡 [추가됨] 로그인 화면에서 뒤로가기 (주소창 초기화)
+      onBack={() => {
+        window.history.replaceState(null, '', '/');
+        setStep('HOME');
+      }}
       onLogin={(user) => {
         setCurrentUser(user);
         setStep('GRID');
@@ -94,7 +100,16 @@ export default function ScheduleApp() {
   }
 
   if (step === 'GRID' && roomConfig && currentUser) {
-    return <DynamicTimeGrid config={roomConfig} currentUser={currentUser} isHost={isHost} />;
+    return <DynamicTimeGrid 
+      config={roomConfig} 
+      currentUser={currentUser} 
+      isHost={isHost} 
+      // 💡 [추가됨] 투표 화면에서 뒤로가기 (주소창 초기화)
+      onBack={() => {
+        window.history.replaceState(null, '', '/');
+        setStep('HOME');
+      }}
+    />;
   }
 
   return null;
