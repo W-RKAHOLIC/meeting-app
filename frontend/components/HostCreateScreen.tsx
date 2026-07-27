@@ -1,4 +1,3 @@
-// frontend/components/HostCreateScreen.tsx
 'use client'
 
 import React, { useState } from 'react';
@@ -18,7 +17,7 @@ export default function HostCreateScreen({ onComplete }: { onComplete: (config: 
     if (!title || !startDate || !endDate) return alert('모든 필드를 입력해주세요.');
     if (new Date(startDate) > new Date(endDate)) return alert('종료 날짜가 시작 날짜보다 빠를 수 없습니다.');
     
-    // 💡 expireDays가 백엔드로 전달됩니다.
+    // 💡 expireDays가 백엔드로 함께 전달됩니다.
     onComplete({ title, startDate, endDate, startTime, endTime, interval, expireDays });
   };
 
@@ -64,7 +63,7 @@ export default function HostCreateScreen({ onComplete }: { onComplete: (config: 
               </select>
             </div>
             
-            {/* 💡 새로 추가된 유효기간 입력 필드 */}
+            {/* 💡 바로 이 부분에 [투표 마감 기한] 드롭다운이 뜹니다! */}
             <div className="flex flex-col gap-1.5 flex-1">
               <label className="text-sm font-bold text-gray-700">투표 마감 기한</label>
               <select value={expireDays} onChange={e => setExpireDays(Number(e.target.value))} className="p-3 bg-gray-50 border border-gray-200 rounded-xl text-sm outline-none font-bold text-blue-600">
