@@ -1,60 +1,86 @@
+// frontend/components/HostCreateScreen.tsx
 'use client'
 
 import React, { useState } from 'react';
-import { Calendar, Clock, ArrowRight } from 'lucide-react';
 import { RoomConfig } from './types';
 
-// 💡 방 코드는 백엔드가 만들어주므로 Omit으로 제외(방 생성 시점에는 코드 없음)
-export default function HostCreateScreen({ onComplete }: { onComplete: (config: Omit<RoomConfig, 'roomCode'>) => void }) {
+export default function HostCreateScreen({ onComplete }: { onComplete: (config: RoomConfig) => void }) {
   const [title, setTitle] = useState('');
   const [startDate, setStartDate] = useState('');
   const [endDate, setEndDate] = useState('');
   const [startTime, setStartTime] = useState('09:00');
   const [endTime, setEndTime] = useState('18:00');
-  const [interval, setInterval] = useState(30);
+  const [interval, setIntervalVal] = useState(30);
+  const [expireDays, setExpireDays] = useState(7); // 💡 기본 마감 기한: 7일
 
-  const handleSubmit = () => {
-    if (!title || !startDate || !endDate) return alert('모든 항목을 입력해주세요!');
-    if (new Date(startDate) > new Date(endDate)) return alert('종료일이 시작일보다 빠를 수 없습니다.');
+  const handleSubmit = (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!title || !startDate || !endDate) return alert('모든 필드를 입력해주세요.');
+    if (new Date(startDate) > new Date(endDate)) return alert('종료 날짜가 시작 날짜보다 빠를 수 없습니다.');
     
-    // 백엔드로 순수 설정 데이터만 넘깁니다.
-    onComplete({ title, startDate, endDate, startTime, endTime, interval });
+    // 💡 expireDays가 백엔드로 전달됩니다.
+    onComplete({ title, startDate, endDate, startTime, endTime, interval, expireDays });
   };
 
   return (
-    <div className="max-w-md mx-auto min-h-screen bg-gray-50 flex flex-col p-6">
-      <div className="mt-10 mb-8">
-        <h1 className="text-2xl font-bold text-gray-900">새로운 모임 만들기</h1>
-        <p className="text-gray-500 mt-2">팀원들과 일정을 조율할 방을 생성합니다.</p>
-      </div>
-      <div className="bg-white p-6 rounded-2xl shadow-sm border border-gray-100 flex flex-col gap-5">
-        <div>
-          <label className="text-sm font-bold text-gray-700 flex items-center gap-2 mb-2"><Calendar className="w-4 h-4"/> 모임 이름</label>
-          <input type="text" value={title} onChange={e => setTitle(e.target.value)} placeholder="예: [프로젝트 A] 킥오프 미팅" className="w-full bg-gray-50 p-3 rounded-xl border border-gray-200 outline-none focus:border-black transition-all" />
-        </div>
-        <div>
-          <label className="text-sm font-bold text-gray-700 flex items-center gap-2 mb-2"><Calendar className="w-4 h-4"/> 날짜 범위</label>
-          <div className="flex gap-2 items-center">
-            <input type="date" value={startDate} onChange={e => setStartDate(e.target.value)} className="flex-1 bg-gray-50 p-3 rounded-xl border border-gray-200 text-sm" />
-            <span className="text-gray-400">~</span>
-            <input type="date" value={endDate} onChange={e => setEndDate(e.target.value)} className="flex-1 bg-gray-50 p-3 rounded-xl border border-gray-200 text-sm" />
+    <div className="max-w-md mx-auto min-h-screen bg-gray-50 flex flex-col items-center justify-center p-6">
+      <div className="w-full bg-white rounded-3xl shadow-xl p-8 border border-gray-100">
+        <h2 className="text-2xl font-extrabold text-gray-900 mb-6 text-center">새로운 일정 조율</h2>
+        
+        <form onSubmit={handleSubmit} className="flex flex-col gap-5">
+          <div className="flex flex-col gap-1.5">
+            <label className="text-sm font-bold text-gray-700">모임 이름</label>
+            <input type="text" value={title} onChange={e => setTitle(e.target.value)} placeholder="예: 프론트엔드 팀 회의" className="p-3 bg-gray-50 border border-gray-200 rounded-xl focus:ring-2 focus:ring-blue-500 outline-none transition-all" />
           </div>
-        </div>
-        <div>
-          <label className="text-sm font-bold text-gray-700 flex items-center gap-2 mb-2"><Clock className="w-4 h-4"/> 시간 범위 및 단위</label>
-          <div className="flex gap-2 items-center mb-2">
-            <input type="time" value={startTime} onChange={e => setStartTime(e.target.value)} className="flex-1 bg-gray-50 p-3 rounded-xl border border-gray-200 text-sm" />
-            <span className="text-gray-400">~</span>
-            <input type="time" value={endTime} onChange={e => setEndTime(e.target.value)} className="flex-1 bg-gray-50 p-3 rounded-xl border border-gray-200 text-sm" />
+
+          <div className="flex gap-4">
+            <div className="flex flex-col gap-1.5 flex-1">
+              <label className="text-sm font-bold text-gray-700">시작 날짜</label>
+              <input type="date" value={startDate} onChange={e => setStartDate(e.target.value)} className="p-3 bg-gray-50 border border-gray-200 rounded-xl text-sm outline-none" />
+            </div>
+            <div className="flex flex-col gap-1.5 flex-1">
+              <label className="text-sm font-bold text-gray-700">종료 날짜</label>
+              <input type="date" value={endDate} onChange={e => setEndDate(e.target.value)} className="p-3 bg-gray-50 border border-gray-200 rounded-xl text-sm outline-none" />
+            </div>
           </div>
-          <select value={interval} onChange={e => setInterval(Number(e.target.value))} className="w-full bg-gray-50 p-3 rounded-xl border border-gray-200 text-sm outline-none">
-            <option value={30}>30분 단위</option>
-            <option value={60}>1시간 단위</option>
-          </select>
-        </div>
-        <button onClick={handleSubmit} className="mt-4 w-full bg-black text-white p-4 rounded-xl font-bold flex items-center justify-center gap-2 hover:bg-gray-800 transition-colors">
-          방 생성하기 <ArrowRight className="w-5 h-5" />
-        </button>
+
+          <div className="flex gap-4">
+            <div className="flex flex-col gap-1.5 flex-1">
+              <label className="text-sm font-bold text-gray-700">시작 시간</label>
+              <input type="time" value={startTime} onChange={e => setStartTime(e.target.value)} className="p-3 bg-gray-50 border border-gray-200 rounded-xl text-sm outline-none" />
+            </div>
+            <div className="flex flex-col gap-1.5 flex-1">
+              <label className="text-sm font-bold text-gray-700">종료 시간</label>
+              <input type="time" value={endTime} onChange={e => setEndTime(e.target.value)} className="p-3 bg-gray-50 border border-gray-200 rounded-xl text-sm outline-none" />
+            </div>
+          </div>
+
+          <div className="flex gap-4">
+            <div className="flex flex-col gap-1.5 flex-1">
+              <label className="text-sm font-bold text-gray-700">시간 간격</label>
+              <select value={interval} onChange={e => setIntervalVal(Number(e.target.value))} className="p-3 bg-gray-50 border border-gray-200 rounded-xl text-sm outline-none">
+                <option value={30}>30분 단위</option>
+                <option value={60}>1시간 단위</option>
+              </select>
+            </div>
+            
+            {/* 💡 새로 추가된 유효기간 입력 필드 */}
+            <div className="flex flex-col gap-1.5 flex-1">
+              <label className="text-sm font-bold text-gray-700">투표 마감 기한</label>
+              <select value={expireDays} onChange={e => setExpireDays(Number(e.target.value))} className="p-3 bg-gray-50 border border-gray-200 rounded-xl text-sm outline-none font-bold text-blue-600">
+                <option value={1}>1일 뒤 마감</option>
+                <option value={3}>3일 뒤 마감</option>
+                <option value={7}>7일 뒤 마감</option>
+                <option value={14}>14일 뒤 마감</option>
+                <option value={30}>30일 뒤 마감</option>
+              </select>
+            </div>
+          </div>
+
+          <button type="submit" className="mt-4 w-full bg-black text-white font-bold py-4 rounded-xl shadow-md hover:bg-gray-800 transition-colors active:scale-[0.98]">
+            방 만들기
+          </button>
+        </form>
       </div>
     </div>
   );

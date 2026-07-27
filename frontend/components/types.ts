@@ -26,3 +26,18 @@ export interface CellData {
   votes: Record<string, VoteType>; // 💡 수정됨: { "홍길동": "BEST", "김철수": "POSSIBLE" } 형태로 저장
   comments: Comment[];
 }
+
+// frontend/components/types.ts
+
+export interface RoomConfig {
+  roomCode: string;
+  title: string;
+  startDate: string;
+  endDate: string;
+  startTime: string;
+  endTime: string;
+  interval: number;
+  expireDays: number; // 💡 [추가됨] 프론트엔드에도 유효기간 속성 추가
+}
+
+// (아래의 User, VoteType, Comment, CellData, Step 등은 기존 코드 유지)
