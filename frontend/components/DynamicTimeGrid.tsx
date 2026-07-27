@@ -139,17 +139,14 @@ export default function DynamicTimeGrid({ config, currentUser, isHost = false, o
 
   const getCellKey = (date: string, time: string) => `${date}-${time}`;
 
-  // 💡 [핵심 조정] 칸을 클릭/터치했을 때의 동작
-  const handleCellClickOrTap = (key: string) => {
-    // 1. '종합 결과' 모드일 때는 무조건 상세 통계 팝업 띄우기
+  // 💡 공통 실행 로직 (터치든 클릭이든 이 함수가 실행됨)
+  const executeCellAction = (key: string) => {
     if (viewMode === 'ALL') {
       setActiveCellKey(key);
       return;
     }
 
-    // 2. '내 투표' 모드일 때
     if (selectedVote) {
-      // 투표 도구(최적/가능/불가)가 선택되어 있다면 토글(칠하기/지우기) 실행
       setCells(prev => {
         const newCells = { ...prev };
         const cell = newCells[key] || { votes: {}, comments: [] };
@@ -165,20 +162,17 @@ export default function DynamicTimeGrid({ config, currentUser, isHost = false, o
         }
         return newCells;
       });
-    } else {
-      // 투표 도구를 선택하지 않은 상태에서 '내 투표' 모드라면 상세 창을 띄울 필요가 없음 (방지)
-      // 원하신다면 이 때 아무 것도 안 하거나 가이드 메시지를 줄 수 있습니다.
     }
   };
 
-  // PC 마우스 드래그 전용 핸들러
   const handleMouseDown = (key: string) => {
-    if (viewMode === 'ALL') return;
+    if (viewMode === 'ALL') {
+      executeCellAction(key);
+      return;
+    }
     if (selectedVote) {
       isMouseDown.current = true;
-      handleCellClickOrTap(key);
-    } else {
-      handleCellClickOrTap(key);
+      executeCellAction(key);
     }
   };
 
@@ -349,7 +343,6 @@ export default function DynamicTimeGrid({ config, currentUser, isHost = false, o
         )}
       </header>
 
-      {/* 💡 모바일 터치 스크롤이 자연스럽게 작동하도록 수정 */}
       <div className="flex-1 overflow-x-auto select-none bg-gray-50">
         <div className="flex p-4 min-w-max">
           <div className="flex flex-col mr-2">
@@ -385,7 +378,12 @@ export default function DynamicTimeGrid({ config, currentUser, isHost = false, o
                     data-key={key}
                     onMouseDown={() => handleMouseDown(key)}
                     onMouseEnter={() => handleMouseEnter(key)}
-                    onClick={() => handleCellClickOrTap(key)}
+                    // 💡 [핵심 수정] 스마트폰 터치 발생 시 곧바로 액션이 실행되도록 onTouchStart 추가!
+                    onTouchStart={(e) => {
+                      e.preventDefault(); // 모바일 더블탭 확대 방지 및 즉각 반응
+                      executeCellAction(key);
+                    }}
+                    onClick={() => executeCellAction(key)}
                     className={cellClasses}
                   >
                     {viewMode === 'ALL' && displayCount > 0 && <span className={`text-[12px] font-extrabold ${textColor}`}>{displayCount}명</span>}
