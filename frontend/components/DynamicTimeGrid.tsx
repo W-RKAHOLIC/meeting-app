@@ -40,15 +40,6 @@ export default function DynamicTimeGrid({ config, currentUser, isHost = false, o
   const [isSaving, setIsSaving] = useState(false);
   const [viewMode, setViewMode] = useState<'MY' | 'ALL'>('MY');
 
-  const isMouseDown = useRef(false);
-  const touchStartPos = useRef<{ x: number, y: number }>({ x: 0, y: 0 });
-
-  useEffect(() => {
-    const stopDrag = () => { isMouseDown.current = false; };
-    window.addEventListener('mouseup', stopDrag);
-    return () => { window.removeEventListener('mouseup', stopDrag); };
-  }, []);
-
   useEffect(() => {
     setDates(generateDates(config.startDate, config.endDate));
     setTimes(generateTimes(config.startTime, config.endTime, config.interval));
@@ -140,7 +131,8 @@ export default function DynamicTimeGrid({ config, currentUser, isHost = false, o
 
   const getCellKey = (date: string, time: string) => `${date}-${time}`;
 
-  const executeCellAction = (key: string) => {
+  // 💡 [단순화된 탭/클릭 액션] 칸을 터치하거나 클릭하면 곧바로 투표(토글) 또는 상세 통계 오픈
+  const handleCellClick = (key: string) => {
     if (viewMode === 'ALL') {
       setActiveCellKey(key);
       return;
@@ -158,30 +150,6 @@ export default function DynamicTimeGrid({ config, currentUser, isHost = false, o
           if (Object.keys(newVotes).length === 0 && cell.comments.length === 0) delete newCells[key];
           else newCells[key] = { ...cell, votes: newVotes };
         } else {
-          newCells[key] = { ...cell, votes: { ...cell.votes, [currentUser.name]: selectedVote } };
-        }
-        return newCells;
-      });
-    }
-  };
-
-  const handleMouseDown = (key: string) => {
-    if (viewMode === 'ALL') {
-      executeCellAction(key);
-      return;
-    }
-    if (selectedVote) {
-      isMouseDown.current = true;
-      executeCellAction(key);
-    }
-  };
-
-  const handleMouseEnter = (key: string) => {
-    if (isMouseDown.current && selectedVote && viewMode === 'MY') {
-      setCells(prev => {
-        const newCells = { ...prev };
-        const cell = newCells[key] || { votes: {}, comments: [] };
-        if (cell.votes[currentUser.name] !== selectedVote) {
           newCells[key] = { ...cell, votes: { ...cell.votes, [currentUser.name]: selectedVote } };
         }
         return newCells;
@@ -376,24 +344,8 @@ export default function DynamicTimeGrid({ config, currentUser, isHost = false, o
                   <div 
                     key={key} 
                     data-key={key}
-                    onMouseDown={() => handleMouseDown(key)}
-                    onMouseEnter={() => handleMouseEnter(key)}
-                    // 💡 [핵심 보완] PC 마우스 단순 클릭(onClick)과 모바일 탭(onTouchEnd) 모두 완벽 작동!
-                    onClick={() => executeCellAction(key)}
-                    onTouchStart={(e) => {
-                      const touch = e.touches[0];
-                      touchStartPos.current = { x: touch.clientX, y: touch.clientY };
-                    }}
-                    onTouchEnd={(e) => {
-                      const touch = e.changedTouches[0];
-                      const moveX = Math.abs(touch.clientX - touchStartPos.current.x);
-                      const moveY = Math.abs(touch.clientY - touchStartPos.current.y);
-                      
-                      if (moveX < 10 && moveY < 10) {
-                        e.preventDefault();
-                        executeCellAction(key);
-                      }
-                    }}
+                    // 💡 오직 직관적인 클릭(탭) 이벤트 하나로만 통합하여 오작동을 원천 차단합니다.
+                    onClick={() => handleCellClick(key)}
                     className={cellClasses}
                   >
                     {viewMode === 'ALL' && displayCount > 0 && <span className={`text-[12px] font-extrabold ${textColor}`}>{displayCount}명</span>}
