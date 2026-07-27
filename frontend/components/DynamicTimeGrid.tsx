@@ -378,6 +378,8 @@ export default function DynamicTimeGrid({ config, currentUser, isHost = false, o
                     data-key={key}
                     onMouseDown={() => handleMouseDown(key)}
                     onMouseEnter={() => handleMouseEnter(key)}
+                    // 💡 [핵심 보완] PC 마우스 단순 클릭(onClick)과 모바일 탭(onTouchEnd) 모두 완벽 작동!
+                    onClick={() => executeCellAction(key)}
                     onTouchStart={(e) => {
                       const touch = e.touches[0];
                       touchStartPos.current = { x: touch.clientX, y: touch.clientY };
@@ -392,9 +394,6 @@ export default function DynamicTimeGrid({ config, currentUser, isHost = false, o
                         executeCellAction(key);
                       }
                     }}
-                    onClick={() => {
-                      executeCellAction(key);
-                    }}
                     className={cellClasses}
                   >
                     {viewMode === 'ALL' && displayCount > 0 && <span className={`text-[12px] font-extrabold ${textColor}`}>{displayCount}명</span>}
@@ -407,7 +406,6 @@ export default function DynamicTimeGrid({ config, currentUser, isHost = false, o
         </div>
       </div>
       
-      {/* 💡 [핵심 고정] fixed bottom-0 와 max-w-md mx-auto를 사용하여 모바일 화면 최하단에 완벽 고정되도록 변경했습니다 */}
       <div className={`fixed bottom-0 left-0 right-0 p-4 bg-gradient-to-t from-white via-white to-transparent z-30 transition-transform duration-300 max-w-md mx-auto ${viewMode === 'ALL' ? 'translate-y-full opacity-0 pointer-events-none' : 'translate-y-0 opacity-100'}`}>
         <div className="bg-white p-2 rounded-2xl shadow-[0_-4px_20px_rgba(0,0,0,0.15)] flex gap-2 border border-gray-100">
           <button onClick={() => setSelectedVote(prev => prev === 'BEST' ? null : 'BEST')} className={`flex-1 py-3 rounded-xl font-bold text-sm transition-all ${selectedVote === 'BEST' ? 'bg-blue-500 text-white shadow-md' : 'bg-blue-50 text-blue-600'}`}>최적</button>
