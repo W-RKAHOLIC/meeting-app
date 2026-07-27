@@ -40,16 +40,12 @@ export default function DynamicTimeGrid({ config, currentUser, isHost = false, o
   const [isSaving, setIsSaving] = useState(false);
   const [viewMode, setViewMode] = useState<'MY' | 'ALL'>('MY');
 
-  const isDragging = useRef(false);
+  const isMouseDown = useRef(false);
 
   useEffect(() => {
-    const stopDrag = () => { isDragging.current = false; };
+    const stopDrag = () => { isMouseDown.current = false; };
     window.addEventListener('mouseup', stopDrag);
-    window.addEventListener('touchend', stopDrag);
-    return () => {
-      window.removeEventListener('mouseup', stopDrag);
-      window.removeEventListener('touchend', stopDrag);
-    };
+    return () => { window.removeEventListener('mouseup', stopDrag); };
   }, []);
 
   useEffect(() => {
@@ -143,11 +139,17 @@ export default function DynamicTimeGrid({ config, currentUser, isHost = false, o
 
   const getCellKey = (date: string, time: string) => `${date}-${time}`;
 
-  const handlePointerDown = (key: string) => {
-    if (viewMode === 'ALL') { setActiveCellKey(key); return; }
+  // 💡 [핵심 조정] 칸을 클릭/터치했을 때의 동작
+  const handleCellClickOrTap = (key: string) => {
+    // 1. '종합 결과' 모드일 때는 무조건 상세 통계 팝업 띄우기
+    if (viewMode === 'ALL') {
+      setActiveCellKey(key);
+      return;
+    }
 
+    // 2. '내 투표' 모드일 때
     if (selectedVote) {
-      isDragging.current = true;
+      // 투표 도구(최적/가능/불가)가 선택되어 있다면 토글(칠하기/지우기) 실행
       setCells(prev => {
         const newCells = { ...prev };
         const cell = newCells[key] || { votes: {}, comments: [] };
@@ -164,12 +166,24 @@ export default function DynamicTimeGrid({ config, currentUser, isHost = false, o
         return newCells;
       });
     } else {
-      setActiveCellKey(key);
+      // 투표 도구를 선택하지 않은 상태에서 '내 투표' 모드라면 상세 창을 띄울 필요가 없음 (방지)
+      // 원하신다면 이 때 아무 것도 안 하거나 가이드 메시지를 줄 수 있습니다.
     }
   };
 
-  const handlePointerEnter = (key: string) => {
-    if (isDragging.current && selectedVote && viewMode === 'MY') {
+  // PC 마우스 드래그 전용 핸들러
+  const handleMouseDown = (key: string) => {
+    if (viewMode === 'ALL') return;
+    if (selectedVote) {
+      isMouseDown.current = true;
+      handleCellClickOrTap(key);
+    } else {
+      handleCellClickOrTap(key);
+    }
+  };
+
+  const handleMouseEnter = (key: string) => {
+    if (isMouseDown.current && selectedVote && viewMode === 'MY') {
       setCells(prev => {
         const newCells = { ...prev };
         const cell = newCells[key] || { votes: {}, comments: [] };
@@ -178,16 +192,6 @@ export default function DynamicTimeGrid({ config, currentUser, isHost = false, o
         }
         return newCells;
       });
-    }
-  };
-
-  const handleTouchMove = (e: React.TouchEvent) => {
-    if (!isDragging.current || !selectedVote || viewMode === 'ALL') return;
-    const touch = e.touches[0];
-    const target = document.elementFromPoint(touch.clientX, touch.clientY);
-    if (target) {
-      const key = target.getAttribute('data-key');
-      if (key) handlePointerEnter(key);
     }
   };
 
@@ -270,7 +274,6 @@ export default function DynamicTimeGrid({ config, currentUser, isHost = false, o
     setCells(prev => ({ ...prev, [activeCellKey]: { ...prev[activeCellKey], comments: prev[activeCellKey].comments.filter(c => c.id !== commentId) } }));
   };
 
-  // 💡 [새 기능] 투표 또는 메모를 남긴 전체 참여자 명단 추출
   const participants = useMemo(() => {
     const names = new Set<string>();
     Object.values(cells).forEach(cell => {
@@ -328,7 +331,6 @@ export default function DynamicTimeGrid({ config, currentUser, isHost = false, o
           <button onClick={() => { setViewMode('ALL'); setSelectedVote(null); }} className={`flex-1 flex items-center justify-center gap-1 py-2 rounded-lg text-sm font-bold transition-all ${viewMode === 'ALL' ? 'bg-blue-500 shadow text-white' : 'text-gray-500 hover:text-gray-700'}`}><Users className="w-4 h-4" /> 종합 결과</button>
         </div>
 
-        {/* 💡 [새 기능] '종합 결과' 모드일 때만 참여자 명단 스크롤이 나타납니다 */}
         {viewMode === 'ALL' && (
           <div className="mt-3 flex items-center gap-2 overflow-x-auto pb-1 scrollbar-hide">
             <div className="text-xs font-bold text-blue-600 whitespace-nowrap flex items-center gap-1 bg-blue-50 px-2 py-1 rounded-md">
@@ -347,10 +349,8 @@ export default function DynamicTimeGrid({ config, currentUser, isHost = false, o
         )}
       </header>
 
-      <div 
-        className="flex-1 overflow-x-auto select-none bg-gray-50" 
-        style={{ touchAction: selectedVote && viewMode === 'MY' ? 'none' : 'auto' }}
-      >
+      {/* 💡 모바일 터치 스크롤이 자연스럽게 작동하도록 수정 */}
+      <div className="flex-1 overflow-x-auto select-none bg-gray-50">
         <div className="flex p-4 min-w-max">
           <div className="flex flex-col mr-2">
             <div onClick={handleAllClick} className={`h-8 flex items-center justify-end text-xs font-bold text-gray-400 pr-2 rounded-md ${selectedVote && viewMode === 'MY' ? 'cursor-pointer hover:bg-gray-200 hover:text-blue-600' : ''}`}>{selectedVote && viewMode === 'MY' ? '전체선택' : ''}</div>
@@ -383,10 +383,9 @@ export default function DynamicTimeGrid({ config, currentUser, isHost = false, o
                   <div 
                     key={key} 
                     data-key={key}
-                    onMouseDown={() => handlePointerDown(key)}
-                    onMouseEnter={() => handlePointerEnter(key)}
-                    onTouchStart={() => handlePointerDown(key)}
-                    onTouchMove={handleTouchMove}
+                    onMouseDown={() => handleMouseDown(key)}
+                    onMouseEnter={() => handleMouseEnter(key)}
+                    onClick={() => handleCellClickOrTap(key)}
                     className={cellClasses}
                   >
                     {viewMode === 'ALL' && displayCount > 0 && <span className={`text-[12px] font-extrabold ${textColor}`}>{displayCount}명</span>}
