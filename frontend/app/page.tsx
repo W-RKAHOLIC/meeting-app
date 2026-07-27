@@ -1,13 +1,12 @@
 'use client'
 
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import HomeScreen from '../components/HomeScreen';
 import HostCreateScreen from '../components/HostCreateScreen';
 import ParticipantLoginScreen from '../components/ParticipantLoginScreen';
 import DynamicTimeGrid from '../components/DynamicTimeGrid';
 import { Step, RoomConfig, User } from '../components/types';
 
-// 💡 백엔드 라이브 서버 주소를 상수로 빼서 관리합니다.
 const API_BASE_URL = 'https://meeting-app-dade.onrender.com/api/rooms';
 
 export default function ScheduleApp() {
@@ -16,34 +15,45 @@ export default function ScheduleApp() {
   const [currentUser, setCurrentUser] = useState<User | null>(null);
   const [isHost, setIsHost] = useState(false);
 
+  // 💡 [핵심] 누군가 링크(?code=...)를 타고 들어왔을 때 자동 입장시키는 로직
+  useEffect(() => {
+    const params = new URLSearchParams(window.location.search);
+    const code = params.get('code');
+    if (code && step === 'HOME') {
+      handleJoin(code);
+    }
+  }, []);
+
+  const handleJoin = async (code: string) => {
+    try {
+      const res = await fetch(`${API_BASE_URL}/${code}`);
+      if (!res.ok) throw new Error('방을 찾을 수 없습니다. 코드를 확인해주세요.');
+      
+      const data = await res.json();
+      setRoomConfig(data);
+      
+      const savedToken = localStorage.getItem(`hostToken_${code}`);
+      setIsHost(!!savedToken);
+
+      // 주소창을 깔끔하게 공유용 링크로 덮어쓰기
+      window.history.pushState(null, '', `/?code=${code}`);
+      setStep('LOGIN');
+    } catch (err: any) {
+      alert(err.message);
+      window.history.replaceState(null, '', '/'); // 실패 시 홈 주소로 복구
+    }
+  };
+
   if (step === 'HOME') {
     return <HomeScreen 
       onCreate={() => setStep('CREATE')} 
-      onJoin={async (code) => {
-        try {
-          // 💡 수정됨: Render 라이브 주소 적용
-          const res = await fetch(`${API_BASE_URL}/${code}`);
-          if (!res.ok) throw new Error('방을 찾을 수 없습니다. 코드를 확인해주세요.');
-          
-          const data = await res.json();
-          setRoomConfig(data);
-          
-          const savedToken = localStorage.getItem(`hostToken_${code}`);
-          if (savedToken) setIsHost(true);
-          else setIsHost(false);
-
-          setStep('LOGIN');
-        } catch (err: any) {
-          alert(err.message);
-        }
-      }} 
+      onJoin={handleJoin} // 💡 수정된 입장 로직 연결
     />;
   }
 
   if (step === 'CREATE') {
     return <HostCreateScreen onComplete={async (config) => {
       try {
-        // 💡 수정됨: Render 라이브 주소 적용
         const res = await fetch(API_BASE_URL, {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
@@ -57,16 +67,18 @@ export default function ScheduleApp() {
           localStorage.setItem(`hostToken_${roomCode}`, hostToken);
           setIsHost(true);
 
-          alert(`방이 성공적으로 생성되었습니다!\n🎉 참여 코드: [ ${roomCode} ]\n팀원들에게 이 코드를 공유해주세요.`);
+          alert(`방이 성공적으로 생성되었습니다!\n팀원들에게 링크를 공유해주세요.`);
           
           setRoomConfig({ ...config, roomCode });
+          // 방 생성 직후 주소창에 내 방 링크 박제!
+          window.history.pushState(null, '', `/?code=${roomCode}`);
           setStep('LOGIN');
         } else {
           const errorData = await res.json();
           alert(`방 생성 실패: ${errorData.detail}`);
         }
       } catch (err) {
-        alert('백엔드 서버와 통신할 수 없습니다. 서버가 켜져 있는지 확인해주세요.');
+        alert('백엔드 서버와 통신할 수 없습니다.');
       }
     }} />;
   }

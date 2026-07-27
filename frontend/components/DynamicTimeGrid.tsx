@@ -1,7 +1,8 @@
 'use client'
 
 import React, { useState, useEffect, useMemo } from 'react';
-import { X, Trash2, Users } from 'lucide-react';
+// 💡 Share2 아이콘이 추가되었습니다!
+import { X, Trash2, Users, Share2 } from 'lucide-react'; 
 import { RoomConfig, User, VoteType, CellData, Comment } from './types';
 
 const API_BASE_URL = 'https://meeting-app-dade.onrender.com/api/rooms';
@@ -62,6 +63,31 @@ export default function DynamicTimeGrid({ config, currentUser, isHost = false }:
       })
       .catch(err => console.error("데이터 로드 실패:", err));
   }, [config]);
+
+  // 💡 [핵심] 공유하기 버튼 클릭 로직
+  const handleShare = async () => {
+    // 현재 주소창의 도메인(예: https://xxx.vercel.app)을 가져와서 코드를 붙입니다.
+    const shareUrl = `${window.location.origin}/?code=${config.roomCode}`;
+    const shareData = {
+      title: config.title,
+      text: `[${config.title}] 일정 조율에 초대합니다! 참여해주세요 🗓️`,
+      url: shareUrl,
+    };
+
+    // 폰(모바일 브라우저)이라면 카카오톡/문자 공유 창을 띄웁니다!
+    if (navigator.share) {
+      try {
+        await navigator.share(shareData);
+      } catch (err) {
+        console.log('공유 취소됨');
+      }
+    } else {
+      // PC이거나 지원하지 않는 브라우저면 깔끔하게 복사해 줍니다.
+      navigator.clipboard.writeText(shareUrl).then(() => {
+        alert('초대 링크가 복사되었습니다!\n카카오톡 등에 붙여넣기 해주세요.');
+      });
+    }
+  };
 
   const handleSaveToServer = async () => {
     setIsSaving(true);
@@ -182,7 +208,6 @@ export default function DynamicTimeGrid({ config, currentUser, isHost = false }:
   const handleRowClick = (time: string) => applyBulkUpdate(dates.map(d => getCellKey(d, time)));
   const handleAllClick = () => applyBulkUpdate(dates.flatMap(d => times.map(t => getCellKey(d, t))));
 
-  // 💡 1. 그리드 전체에서 '가장 높은 점수(1등)'를 찾아내는 로직 추가
   const globalMaxScore = useMemo(() => {
     let max = 0;
     Object.values(cells).forEach(cell => {
@@ -197,7 +222,6 @@ export default function DynamicTimeGrid({ config, currentUser, isHost = false }:
     return max;
   }, [cells]);
 
-  // 💡 2. '상대 평가' 방식으로 가시성을 극대화하는 함수
   const getHeatmapDisplay = (votes: Record<string, VoteType> = {}) => {
     const voters = Object.values(votes);
     if (voters.length === 0) return { bg: 'bg-white', text: '' };
@@ -210,21 +234,11 @@ export default function DynamicTimeGrid({ config, currentUser, isHost = false }:
 
     if (score === 0) return { bg: 'bg-gray-100', text: 'text-gray-400' };
 
-    // 최고 점수를 1.0(100%) 기준으로 삼아 현재 셀의 상대적 비율을 계산합니다.
     const ratio = globalMaxScore > 0 ? score / globalMaxScore : 0;
 
-    // 1위 (현재 투표된 시간 중 가장 최적인 시간대) - 절대값이 낮아도 1위면 하이라이트!
-    if (ratio === 1.0) {
-      return { bg: 'bg-indigo-900 border-2 border-yellow-400 shadow-md scale-[1.02] z-10', text: 'text-yellow-400 font-black' };
-    }
-    
-    // 70% 이상 (1위는 아니지만 상당히 좋은 차선책)
+    if (ratio === 1.0) return { bg: 'bg-indigo-900 border-2 border-yellow-400 shadow-md scale-[1.02] z-10', text: 'text-yellow-400 font-black' };
     if (ratio >= 0.7) return { bg: 'bg-indigo-600', text: 'text-white' };
-
-    // 40% 이상 (무난한 시간대)
     if (ratio >= 0.4) return { bg: 'bg-blue-500', text: 'text-white' };
-
-    // 40% 미만 (참여율이 저조한 시간대)
     return { bg: 'bg-sky-200', text: 'text-sky-900' };
   };
 
@@ -276,10 +290,23 @@ export default function DynamicTimeGrid({ config, currentUser, isHost = false }:
             </div>
           </div>
           <div className="flex gap-2">
-            {isHost && <button onClick={handleCloseRoom} className="bg-red-50 text-red-600 border border-red-200 px-3 py-2 rounded-lg text-sm font-bold">마감</button>}
+            {/* 💡 공유 버튼 추가 */}
+            <button 
+              onClick={handleShare} 
+              className="bg-blue-50 text-blue-600 border border-blue-200 px-3 py-2 rounded-lg text-sm font-bold flex items-center gap-1 hover:bg-blue-100 transition-colors"
+            >
+              <Share2 className="w-4 h-4" /> 공유
+            </button>
             <button onClick={handleSaveToServer} disabled={isSaving} className="bg-black text-white px-4 py-2 rounded-lg text-sm font-bold">{isSaving ? '저장...' : '저장'}</button>
           </div>
         </div>
+        
+        {/* 방장 마감 버튼은 공간 확보를 위해 아래로 이동 */}
+        {isHost && (
+          <div className="mt-3 flex justify-end">
+            <button onClick={handleCloseRoom} className="text-red-500 text-xs font-bold underline hover:text-red-700">방 마감하기</button>
+          </div>
+        )}
         
         <div className="flex bg-gray-100 p-1 rounded-xl mt-4 border border-gray-200">
           <button onClick={() => { setViewMode('MY'); setSelectedVote(null); }} className={`flex-1 flex items-center justify-center gap-1 py-2 rounded-lg text-sm font-bold transition-all ${viewMode === 'MY' ? 'bg-white shadow text-black' : 'text-gray-500'}`}>
