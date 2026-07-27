@@ -1,20 +1,25 @@
-export type Step = 'HOME' | 'CREATE' | 'LOGIN' | 'GRID'; // 💡 HOME 단계 추가
-export type VoteType = 'BEST' | 'POSSIBLE' | 'IMPOSSIBLE';
+// frontend/components/types.ts
+
+export type Step = 'HOME' | 'CREATE' | 'LOGIN' | 'GRID';
 
 export interface RoomConfig {
-  roomCode: string; // 💡 방 고유 코드 추가
+  roomCode?: string;
   title: string;
   startDate: string;
   endDate: string;
   startTime: string;
   endTime: string;
   interval: number;
+  // 💡 빨간 밑줄의 원인 해결! (여기에 expireDays를 추가했습니다)
+  expireDays: number; 
 }
 
 export interface User {
   name: string;
-  pin: string;
+  password?: string;
 }
+
+export type VoteType = 'BEST' | 'POSSIBLE' | 'IMPOSSIBLE';
 
 export interface Comment {
   id: string;
@@ -23,21 +28,6 @@ export interface Comment {
 }
 
 export interface CellData {
-  votes: Record<string, VoteType>; // 💡 수정됨: { "홍길동": "BEST", "김철수": "POSSIBLE" } 형태로 저장
+  votes: Record<string, VoteType>;
   comments: Comment[];
 }
-
-// frontend/components/types.ts
-
-export interface RoomConfig {
-  roomCode: string;
-  title: string;
-  startDate: string;
-  endDate: string;
-  startTime: string;
-  endTime: string;
-  interval: number;
-  expireDays: number; // 💡 [추가됨] 프론트엔드에도 유효기간 속성 추가
-}
-
-// (아래의 User, VoteType, Comment, CellData, Step 등은 기존 코드 유지)
