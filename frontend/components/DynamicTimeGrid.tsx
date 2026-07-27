@@ -41,6 +41,9 @@ export default function DynamicTimeGrid({ config, currentUser, isHost = false, o
   const [viewMode, setViewMode] = useState<'MY' | 'ALL'>('MY');
 
   const isMouseDown = useRef(false);
+  
+  // 💡 [핵심] 스크롤과 터치 탭을 정교하게 구분하기 위한 좌표 기억 장치
+  const touchStartPos = useRef<{ x: number, y: number }>({ x: 0, y: 0 });
 
   useEffect(() => {
     const stopDrag = () => { isMouseDown.current = false; };
@@ -139,7 +142,7 @@ export default function DynamicTimeGrid({ config, currentUser, isHost = false, o
 
   const getCellKey = (date: string, time: string) => `${date}-${time}`;
 
-  // 💡 공통 실행 로직 (터치든 클릭이든 이 함수가 실행됨)
+  // 💡 통합 실행 액션 (탭/클릭 시 수행될 본질적 기능)
   const executeCellAction = (key: string) => {
     if (viewMode === 'ALL') {
       setActiveCellKey(key);
@@ -378,12 +381,27 @@ export default function DynamicTimeGrid({ config, currentUser, isHost = false, o
                     data-key={key}
                     onMouseDown={() => handleMouseDown(key)}
                     onMouseEnter={() => handleMouseEnter(key)}
-                    // 💡 [핵심 수정] 스마트폰 터치 발생 시 곧바로 액션이 실행되도록 onTouchStart 추가!
+                    // 💡 [핵심 스마트 터치 센서]
+                    // 스크롤(손가락 움직임)인지, 가벼운 탭(클릭)인지 판정하여 통계 창 오작동을 완벽 차단합니다!
                     onTouchStart={(e) => {
-                      e.preventDefault(); // 모바일 더블탭 확대 방지 및 즉각 반응
+                      const touch = e.touches[0];
+                      touchStartPos.current = { x: touch.clientX, y: touch.clientY };
+                    }}
+                    onTouchEnd={(e) => {
+                      const touch = e.changedTouches[0];
+                      const moveX = Math.abs(touch.clientX - touchStartPos.current.x);
+                      const moveY = Math.abs(touch.clientY - touchStartPos.current.y);
+                      
+                      // 손가락 움직임이 10픽셀 미만일 때만 '순수한 가벼운 탭'으로 인정합니다!
+                      if (moveX < 10 && moveY < 10) {
+                        e.preventDefault();
+                        executeCellAction(key);
+                      }
+                    }}
+                    onClick={() => {
+                      // PC 환경 클릭 지원
                       executeCellAction(key);
                     }}
-                    onClick={() => executeCellAction(key)}
                     className={cellClasses}
                   >
                     {viewMode === 'ALL' && displayCount > 0 && <span className={`text-[12px] font-extrabold ${textColor}`}>{displayCount}명</span>}
