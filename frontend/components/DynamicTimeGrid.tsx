@@ -80,44 +80,22 @@ export default function DynamicTimeGrid({ config, currentUser, isHost = false, o
   const handleSaveToServer = async () => {
     setIsSaving(true);
     try {
-      const fetchRes = await fetch(`${API_BASE_URL}/${config.roomCode}/schedule`);
-      const dbData = await fetchRes.json();
-      const latestCells: Record<string, CellData> = dbData.cells || {};
-
-      const mergedCells = { ...latestCells };
-
-      Object.keys(mergedCells).forEach(key => {
-        if (mergedCells[key].votes) delete mergedCells[key].votes[currentUser.name];
-      });
-
-      Object.keys(cells).forEach(key => {
-        const myVote = cells[key]?.votes?.[currentUser.name];
-        if (myVote) {
-          if (!mergedCells[key]) mergedCells[key] = { votes: {}, comments: [] };
-          if (!mergedCells[key].votes) mergedCells[key].votes = {};
-          mergedCells[key].votes[currentUser.name] = myVote;
-        }
-        if (cells[key]?.comments?.length > 0) {
-          if (!mergedCells[key]) mergedCells[key] = { votes: {}, comments: [] };
-          mergedCells[key].comments = cells[key].comments;
-        }
-      });
-
-      // 💡 [핵심] 투표 데이터와 함께 현재 로그인한 유저의 이름과 비밀번호를 전송합니다!
       const res = await fetch(`${API_BASE_URL}/${config.roomCode}/schedule`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ 
-          cells: mergedCells,
+          cells: cells, 
           currentUser: { name: currentUser.name, password: currentUser.password } 
         })
       });
       
       if (res.ok) {
-        setCells(mergedCells);
-        alert(`${currentUser.name}님의 투표가 저장되었습니다!`);
+        const data = await res.json();
+        if (data.merged_cells) {
+          setCells(data.merged_cells);
+        }
+        alert(`${currentUser.name}님의 투표가 안전하게 병합 저장되었습니다!`);
       } else {
-        // 백엔드에서 비밀번호가 틀렸다고 튕겨내면 에러 메시지 출력
         const errorData = await res.json();
         alert(errorData.detail || '저장에 실패했습니다.');
       }
