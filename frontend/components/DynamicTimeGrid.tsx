@@ -1,7 +1,6 @@
 'use client'
 
 import React, { useState, useEffect, useMemo } from 'react';
-// 💡 ChevronLeft 아이콘 추가
 import { X, Trash2, Users, Share2, ChevronLeft } from 'lucide-react'; 
 import { RoomConfig, User, VoteType, CellData, Comment } from './types';
 
@@ -31,7 +30,6 @@ function generateTimes(start: string, end: string, interval: number) {
   return times;
 }
 
-// 💡 onBack 프롭 추가
 export default function DynamicTimeGrid({ config, currentUser, isHost = false, onBack }: { config: RoomConfig, currentUser: User, isHost?: boolean, onBack?: () => void }) {
   const [dates, setDates] = useState<string[]>([]);
   const [times, setTimes] = useState<string[]>([]);
@@ -105,16 +103,29 @@ export default function DynamicTimeGrid({ config, currentUser, isHost = false, o
         }
       });
 
+      // 💡 [핵심] 투표 데이터와 함께 현재 로그인한 유저의 이름과 비밀번호를 전송합니다!
       const res = await fetch(`${API_BASE_URL}/${config.roomCode}/schedule`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ cells: mergedCells })
+        body: JSON.stringify({ 
+          cells: mergedCells,
+          currentUser: { name: currentUser.name, password: currentUser.password } 
+        })
       });
+      
       if (res.ok) {
         setCells(mergedCells);
         alert(`${currentUser.name}님의 투표가 저장되었습니다!`);
+      } else {
+        // 백엔드에서 비밀번호가 틀렸다고 튕겨내면 에러 메시지 출력
+        const errorData = await res.json();
+        alert(errorData.detail || '저장에 실패했습니다.');
       }
-    } catch (err) { alert('저장에 실패했습니다.'); } finally { setIsSaving(false); }
+    } catch (err) { 
+      alert('저장에 실패했습니다.'); 
+    } finally { 
+      setIsSaving(false); 
+    }
   };
 
   const handleCloseRoom = async () => {
@@ -253,7 +264,6 @@ export default function DynamicTimeGrid({ config, currentUser, isHost = false, o
         <div className="flex justify-between items-start w-full">
           <div className="flex flex-col">
             <div className="flex items-center gap-1">
-              {/* 💡 투표 화면 상단 뒤로가기 버튼 */}
               {onBack && (
                 <button onClick={onBack} className="text-gray-400 hover:text-black p-1 -ml-1 rounded-lg transition-colors active:scale-95">
                   <ChevronLeft className="w-6 h-6" />
@@ -287,7 +297,6 @@ export default function DynamicTimeGrid({ config, currentUser, isHost = false, o
         </div>
       </header>
 
-      {/* --- 이하 그리드 및 상세 모달 코드는 기존과 완벽히 동일하므로 생략 없이 렌더링 됩니다 --- */}
       <div className="flex-1 overflow-x-auto select-none bg-gray-50">
         <div className="flex p-4 min-w-max">
           <div className="flex flex-col mr-2">

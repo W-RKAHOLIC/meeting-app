@@ -9,7 +9,13 @@ class RoomConfigReq(BaseModel):
     startTime: str
     endTime: str
     interval: int
-    expireDays: int  # 💡 [추가됨] 사용자가 선택한 방 유지 기간 (일 단위)
+    expireDays: int
+
+# 💡 [추가] 유저 로그인 정보 규칙
+class UserReq(BaseModel):
+    name: str
+    password: str
 
 class ScheduleRequest(BaseModel):
     cells: Dict[str, Any]
+    currentUser: UserReq  # 💡 [추가] 투표를 저장할 때 "내가 누구인지" 증명하도록 필수화!

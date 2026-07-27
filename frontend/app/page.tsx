@@ -87,6 +87,7 @@ export default function ScheduleApp() {
   if (step === 'LOGIN' && roomConfig) {
     return <ParticipantLoginScreen 
       roomTitle={`${roomConfig.title} (코드: ${roomConfig.roomCode})`} 
+      roomCode={roomConfig.roomCode!} // 💡 [추가] 방 코드를 로그인 창으로 전달
       onBack={() => {
         window.history.replaceState(null, '', '/');
         setStep('HOME');
