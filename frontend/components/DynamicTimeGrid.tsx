@@ -41,8 +41,6 @@ export default function DynamicTimeGrid({ config, currentUser, isHost = false, o
   const [viewMode, setViewMode] = useState<'MY' | 'ALL'>('MY');
 
   const isMouseDown = useRef(false);
-  
-  // 💡 [핵심] 스크롤과 터치 탭을 정교하게 구분하기 위한 좌표 기억 장치
   const touchStartPos = useRef<{ x: number, y: number }>({ x: 0, y: 0 });
 
   useEffect(() => {
@@ -142,7 +140,6 @@ export default function DynamicTimeGrid({ config, currentUser, isHost = false, o
 
   const getCellKey = (date: string, time: string) => `${date}-${time}`;
 
-  // 💡 통합 실행 액션 (탭/클릭 시 수행될 본질적 기능)
   const executeCellAction = (key: string) => {
     if (viewMode === 'ALL') {
       setActiveCellKey(key);
@@ -291,7 +288,7 @@ export default function DynamicTimeGrid({ config, currentUser, isHost = false, o
   }
 
   return (
-    <div className="max-w-md mx-auto min-h-screen relative bg-white shadow-xl overflow-hidden pb-24 flex flex-col font-sans">
+    <div className="max-w-md mx-auto min-h-screen relative bg-white shadow-xl overflow-hidden pb-32 flex flex-col font-sans">
       <header className="bg-white px-4 py-4 shadow-sm z-10 flex flex-col border-b border-gray-100 transition-all">
         <div className="flex justify-between items-start w-full">
           <div className="flex flex-col">
@@ -381,8 +378,6 @@ export default function DynamicTimeGrid({ config, currentUser, isHost = false, o
                     data-key={key}
                     onMouseDown={() => handleMouseDown(key)}
                     onMouseEnter={() => handleMouseEnter(key)}
-                    // 💡 [핵심 스마트 터치 센서]
-                    // 스크롤(손가락 움직임)인지, 가벼운 탭(클릭)인지 판정하여 통계 창 오작동을 완벽 차단합니다!
                     onTouchStart={(e) => {
                       const touch = e.touches[0];
                       touchStartPos.current = { x: touch.clientX, y: touch.clientY };
@@ -392,14 +387,12 @@ export default function DynamicTimeGrid({ config, currentUser, isHost = false, o
                       const moveX = Math.abs(touch.clientX - touchStartPos.current.x);
                       const moveY = Math.abs(touch.clientY - touchStartPos.current.y);
                       
-                      // 손가락 움직임이 10픽셀 미만일 때만 '순수한 가벼운 탭'으로 인정합니다!
                       if (moveX < 10 && moveY < 10) {
                         e.preventDefault();
                         executeCellAction(key);
                       }
                     }}
                     onClick={() => {
-                      // PC 환경 클릭 지원
                       executeCellAction(key);
                     }}
                     className={cellClasses}
@@ -414,16 +407,17 @@ export default function DynamicTimeGrid({ config, currentUser, isHost = false, o
         </div>
       </div>
       
-      <div className={`absolute bottom-0 left-0 right-0 p-4 bg-gradient-to-t from-white via-white to-transparent z-10 transition-transform duration-300 ${viewMode === 'ALL' ? 'translate-y-full opacity-0 pointer-events-none' : 'translate-y-0 opacity-100'}`}>
-        <div className="bg-white p-2 rounded-2xl shadow-[0_-4px_20px_rgba(0,0,0,0.1)] flex gap-2 border border-gray-100">
+      {/* 💡 [핵심 고정] fixed bottom-0 와 max-w-md mx-auto를 사용하여 모바일 화면 최하단에 완벽 고정되도록 변경했습니다 */}
+      <div className={`fixed bottom-0 left-0 right-0 p-4 bg-gradient-to-t from-white via-white to-transparent z-30 transition-transform duration-300 max-w-md mx-auto ${viewMode === 'ALL' ? 'translate-y-full opacity-0 pointer-events-none' : 'translate-y-0 opacity-100'}`}>
+        <div className="bg-white p-2 rounded-2xl shadow-[0_-4px_20px_rgba(0,0,0,0.15)] flex gap-2 border border-gray-100">
           <button onClick={() => setSelectedVote(prev => prev === 'BEST' ? null : 'BEST')} className={`flex-1 py-3 rounded-xl font-bold text-sm transition-all ${selectedVote === 'BEST' ? 'bg-blue-500 text-white shadow-md' : 'bg-blue-50 text-blue-600'}`}>최적</button>
           <button onClick={() => setSelectedVote(prev => prev === 'POSSIBLE' ? null : 'POSSIBLE')} className={`flex-1 py-3 rounded-xl font-bold text-sm transition-all ${selectedVote === 'POSSIBLE' ? 'bg-green-500 text-white shadow-md' : 'bg-green-50 text-green-600'}`}>가능</button>
           <button onClick={() => setSelectedVote(prev => prev === 'IMPOSSIBLE' ? null : 'IMPOSSIBLE')} className={`flex-1 py-3 rounded-xl font-bold text-sm transition-all ${selectedVote === 'IMPOSSIBLE' ? 'bg-red-500 text-white shadow-md' : 'bg-red-50 text-red-600'}`}>불가</button>
         </div>
       </div>
       
-      <div className={`absolute inset-0 bg-black/50 z-20 transition-opacity duration-300 ${activeCellKey ? 'opacity-100 pointer-events-auto' : 'opacity-0 pointer-events-none'}`} onClick={() => setActiveCellKey(null)} />
-      <div className={`absolute bottom-0 left-0 right-0 bg-white rounded-t-3xl z-30 px-6 pt-3 pb-8 flex flex-col shadow-2xl transition-transform duration-300 ease-out h-[75vh] max-w-md mx-auto ${activeCellKey ? 'translate-y-0' : 'translate-y-full'}`}>
+      <div className={`fixed inset-0 bg-black/50 z-40 transition-opacity duration-300 max-w-md mx-auto ${activeCellKey ? 'opacity-100 pointer-events-auto' : 'opacity-0 pointer-events-none'}`} onClick={() => setActiveCellKey(null)} />
+      <div className={`fixed bottom-0 left-0 right-0 bg-white rounded-t-3xl z-50 px-6 pt-3 pb-8 flex flex-col shadow-2xl transition-transform duration-300 ease-out h-[75vh] max-w-md mx-auto ${activeCellKey ? 'translate-y-0' : 'translate-y-full'}`}>
         <div className="w-12 h-1.5 bg-gray-300 rounded-full mx-auto mb-6" />
         <div className="flex justify-between items-center mb-4">
           <h3 className="font-bold text-lg text-gray-900">{activeCellKey?.replace('-', ' ')} 상세 통계</h3>
