@@ -51,7 +51,6 @@ export default function ScheduleApp() {
 
   if (step === 'CREATE') {
     return <HostCreateScreen 
-      // 💡 [추가됨] 방 생성 중 뒤로가기
       onBack={() => setStep('HOME')} 
       onComplete={async (config) => {
         try {
@@ -68,7 +67,8 @@ export default function ScheduleApp() {
             localStorage.setItem(`hostToken_${roomCode}`, hostToken);
             setIsHost(true);
 
-            alert(`방이 성공적으로 생성되었습니다!\n팀원들에게 링크를 공유해주세요.`);
+            // 💡 [수정됨] 방 코드 표시 복구!
+            alert(`방이 성공적으로 생성되었습니다!\n🎉 참여 코드: [ ${roomCode} ]\n팀원들에게 링크나 코드를 공유해주세요.`);
             
             setRoomConfig({ ...config, roomCode });
             window.history.pushState(null, '', `/?code=${roomCode}`);
@@ -87,7 +87,6 @@ export default function ScheduleApp() {
   if (step === 'LOGIN' && roomConfig) {
     return <ParticipantLoginScreen 
       roomTitle={`${roomConfig.title} (코드: ${roomConfig.roomCode})`} 
-      // 💡 [추가됨] 로그인 화면에서 뒤로가기 (주소창 초기화)
       onBack={() => {
         window.history.replaceState(null, '', '/');
         setStep('HOME');
@@ -104,7 +103,6 @@ export default function ScheduleApp() {
       config={roomConfig} 
       currentUser={currentUser} 
       isHost={isHost} 
-      // 💡 [추가됨] 투표 화면에서 뒤로가기 (주소창 초기화)
       onBack={() => {
         window.history.replaceState(null, '', '/');
         setStep('HOME');

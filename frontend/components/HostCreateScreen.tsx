@@ -36,7 +36,7 @@ export default function HostCreateScreen({ onComplete, onBack }: { onComplete: (
         <form onSubmit={handleSubmit} className="flex flex-col gap-5">
           <div className="flex flex-col gap-1.5">
             <label className="text-sm font-bold text-gray-700">모임 이름</label>
-            <input type="text" value={title} onChange={e => setTitle(e.target.value)} placeholder="예: 프론트엔드 팀 회의" className="p-3 bg-gray-50 border border-gray-200 rounded-xl focus:ring-2 focus:ring-blue-500 outline-none transition-all" />
+            <input type="text" value={title} onChange={e => setTitle(e.target.value)} placeholder="예: 팀 회의" className="p-3 bg-gray-50 border border-gray-200 rounded-xl focus:ring-2 focus:ring-blue-500 outline-none transition-all" />
           </div>
           <div className="flex gap-4">
             <div className="flex flex-col gap-1.5 flex-1">
