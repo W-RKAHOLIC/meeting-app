@@ -1,6 +1,6 @@
 'use client'
 
-import React, { useState, useEffect, useMemo } from 'react';
+import React, { useState, useEffect, useMemo, useRef } from 'react';
 import { X, Trash2, Users, Share2, ChevronLeft } from 'lucide-react'; 
 import { RoomConfig, User, VoteType, CellData, Comment } from './types';
 
@@ -38,43 +38,77 @@ export default function DynamicTimeGrid({ config, currentUser, isHost = false, o
   const [activeCellKey, setActiveCellKey] = useState<string | null>(null);
   const [commentInput, setCommentInput] = useState('');
   const [isSaving, setIsSaving] = useState(false);
-  
   const [viewMode, setViewMode] = useState<'MY' | 'ALL'>('MY');
+
+  // 💡 [드래그 상태 관리] 마우스를 누르고 있는지 여부를 기억합니다.
+  const isDragging = useRef(false);
+
+  useEffect(() => {
+    // 마우스를 떼거나 터치를 끝내면 드래그 모드 종료
+    const stopDrag = () => { isDragging.current = false; };
+    window.addEventListener('mouseup', stopDrag);
+    window.addEventListener('touchend', stopDrag);
+    return () => {
+      window.removeEventListener('mouseup', stopDrag);
+      window.removeEventListener('touchend', stopDrag);
+    };
+  }, []);
 
   useEffect(() => {
     setDates(generateDates(config.startDate, config.endDate));
     setTimes(generateTimes(config.startTime, config.endTime, config.interval));
 
-    fetch(`${API_BASE_URL}/${config.roomCode}/schedule`)
-      .then(res => res.json())
-      .then(data => {
+    // 💡 [실시간 동기화] 백엔드에서 조용히 최신 데이터를 가져옵니다.
+    const fetchSchedule = async () => {
+      try {
+        const res = await fetch(`${API_BASE_URL}/${config.roomCode}/schedule`);
+        const data = await res.json();
         if (data.cells) {
-          const validCells: Record<string, CellData> = {};
-          Object.keys(data.cells).forEach(key => {
-            const cell = data.cells[key];
-            validCells[key] = {
-              votes: cell.votes || (cell.state ? { '이전데이터': cell.state } : {}),
-              comments: cell.comments || []
-            };
+          setCells(prev => {
+            const newCells: Record<string, CellData> = JSON.parse(JSON.stringify(data.cells));
+            const prevCells: Record<string, CellData> = JSON.parse(JSON.stringify(prev));
+            
+            // 💡 [핵심 병합 로직] '나의 데이터(수정 중인 상태)'는 유지하고, 남의 데이터만 덮어씁니다!
+            const allKeys = new Set([...Object.keys(prevCells), ...Object.keys(newCells)]);
+            allKeys.forEach(key => {
+              const localCell = prevCells[key] || { votes: {}, comments: [] };
+              const serverCell = newCells[key] || { votes: {}, comments: [] };
+              
+              // 내 투표 병합 (내가 로컬에서 투표했으면 살리고, 없으면 지움)
+              const myLocalVote = localCell.votes?.[currentUser.name];
+              if (myLocalVote) serverCell.votes[currentUser.name] = myLocalVote;
+              else delete serverCell.votes[currentUser.name];
+              
+              // 내 메모 병합
+              const myLocalComments = (localCell.comments || []).filter(c => c.author === currentUser.name);
+              const otherServerComments = (serverCell.comments || []).filter(c => c.author !== currentUser.name);
+              serverCell.comments = [...otherServerComments, ...myLocalComments];
+              
+              if (Object.keys(serverCell.votes).length === 0 && serverCell.comments.length === 0) {
+                delete newCells[key];
+              } else {
+                newCells[key] = serverCell;
+              }
+            });
+            return newCells;
           });
-          setCells(validCells);
         }
-      })
-      .catch(err => console.error("데이터 로드 실패:", err));
-  }, [config]);
+      } catch (err) {
+        console.log("실시간 업데이트 실패");
+      }
+    };
+
+    fetchSchedule();
+    // 💡 10초마다 자동으로 서버에서 최신 데이터를 확인합니다!
+    const intervalId = setInterval(fetchSchedule, 10000);
+    return () => clearInterval(intervalId);
+  }, [config.roomCode, currentUser.name]);
 
   const handleShare = async () => {
     const shareUrl = `${window.location.origin}/?code=${config.roomCode}`;
-    const shareData = {
-      title: config.title,
-      text: `[${config.title}] 일정 조율에 초대합니다! 참여해주세요 🗓️`,
-      url: shareUrl,
-    };
-    if (navigator.share) {
-      try { await navigator.share(shareData); } catch (err) { console.log('공유 취소됨'); }
-    } else {
-      navigator.clipboard.writeText(shareUrl).then(() => alert('초대 링크가 복사되었습니다!'));
-    }
+    const shareData = { title: config.title, text: `[${config.title}] 일정 조율에 초대합니다! 참여해주세요 🗓️`, url: shareUrl };
+    if (navigator.share) { try { await navigator.share(shareData); } catch (err) { } } 
+    else { navigator.clipboard.writeText(shareUrl).then(() => alert('초대 링크가 복사되었습니다!')); }
   };
 
   const handleSaveToServer = async () => {
@@ -83,27 +117,17 @@ export default function DynamicTimeGrid({ config, currentUser, isHost = false, o
       const res = await fetch(`${API_BASE_URL}/${config.roomCode}/schedule`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ 
-          cells: cells, 
-          currentUser: { name: currentUser.name, password: currentUser.password } 
-        })
+        body: JSON.stringify({ cells: cells, currentUser: { name: currentUser.name, password: currentUser.password } })
       });
-      
       if (res.ok) {
         const data = await res.json();
-        if (data.merged_cells) {
-          setCells(data.merged_cells);
-        }
+        if (data.merged_cells) setCells(data.merged_cells);
         alert(`${currentUser.name}님의 투표가 안전하게 병합 저장되었습니다!`);
       } else {
         const errorData = await res.json();
         alert(errorData.detail || '저장에 실패했습니다.');
       }
-    } catch (err) { 
-      alert('저장에 실패했습니다.'); 
-    } finally { 
-      setIsSaving(false); 
-    }
+    } catch (err) { alert('저장에 실패했습니다.'); } finally { setIsSaving(false); }
   };
 
   const handleCloseRoom = async () => {
@@ -126,25 +150,58 @@ export default function DynamicTimeGrid({ config, currentUser, isHost = false, o
 
   const getCellKey = (date: string, time: string) => `${date}-${time}`;
 
-  const handleCellClick = (date: string, time: string) => {
-    const key = getCellKey(date, time);
-    const cell = cells[key] || { votes: {}, comments: [] };
-    
+  // 💡 [드래그 앤 드롭 시작] 마우스를 누르거나 터치를 시작했을 때
+  const handlePointerDown = (key: string) => {
     if (viewMode === 'ALL') { setActiveCellKey(key); return; }
 
     if (selectedVote) {
-      const currentMyVote = cell.votes[currentUser.name];
-      const newCells = { ...cells };
-      if (currentMyVote === selectedVote) {
-        const newVotes = { ...cell.votes };
-        delete newVotes[currentUser.name];
-        if (Object.keys(newVotes).length === 0 && cell.comments.length === 0) delete newCells[key];
-        else newCells[key] = { ...cell, votes: newVotes };
-      } else {
-        newCells[key] = { ...cell, votes: { ...cell.votes, [currentUser.name]: selectedVote } };
-      }
-      setCells(newCells);
-    } else { setActiveCellKey(key); }
+      isDragging.current = true;
+      setCells(prev => {
+        const newCells = { ...prev };
+        const cell = newCells[key] || { votes: {}, comments: [] };
+        const currentMyVote = cell.votes[currentUser.name];
+        
+        if (currentMyVote === selectedVote) {
+          // 이미 같은 투표면 지우기 (토글)
+          const newVotes = { ...cell.votes };
+          delete newVotes[currentUser.name];
+          if (Object.keys(newVotes).length === 0 && cell.comments.length === 0) delete newCells[key];
+          else newCells[key] = { ...cell, votes: newVotes };
+        } else {
+          // 새로운 투표 칠하기
+          newCells[key] = { ...cell, votes: { ...cell.votes, [currentUser.name]: selectedVote } };
+        }
+        return newCells;
+      });
+    } else {
+      setActiveCellKey(key);
+    }
+  };
+
+  // 💡 [드래그 앤 드롭 진행] 누른 채로 다른 칸에 진입했을 때 (마우스 전용)
+  const handlePointerEnter = (key: string) => {
+    if (isDragging.current && selectedVote && viewMode === 'MY') {
+      setCells(prev => {
+        const newCells = { ...prev };
+        const cell = newCells[key] || { votes: {}, comments: [] };
+        // 드래그 중일 때는 무조건 선택된 색상으로 칠하기만 합니다.
+        if (cell.votes[currentUser.name] !== selectedVote) {
+          newCells[key] = { ...cell, votes: { ...cell.votes, [currentUser.name]: selectedVote } };
+        }
+        return newCells;
+      });
+    }
+  };
+
+  // 💡 [터치 스와이프 진행] 스마트폰에서 누른 채로 손가락을 이동할 때
+  const handleTouchMove = (e: React.TouchEvent) => {
+    if (!isDragging.current || !selectedVote || viewMode === 'ALL') return;
+    const touch = e.touches[0];
+    const target = document.elementFromPoint(touch.clientX, touch.clientY);
+    if (target) {
+      const key = target.getAttribute('data-key'); // 닿은 칸의 열쇠(Key)를 알아냅니다!
+      if (key) handlePointerEnter(key);
+    }
   };
 
   const applyBulkUpdate = (keysToUpdate: string[]) => {
@@ -275,7 +332,11 @@ export default function DynamicTimeGrid({ config, currentUser, isHost = false, o
         </div>
       </header>
 
-      <div className="flex-1 overflow-x-auto select-none bg-gray-50">
+      {/* 💡 [드래그 최적화] 터치로 칠할 때 화면이 위아래로 스크롤 되는 것을 방지합니다. */}
+      <div 
+        className="flex-1 overflow-x-auto select-none bg-gray-50" 
+        style={{ touchAction: selectedVote && viewMode === 'MY' ? 'none' : 'auto' }}
+      >
         <div className="flex p-4 min-w-max">
           <div className="flex flex-col mr-2">
             <div onClick={handleAllClick} className={`h-8 flex items-center justify-end text-xs font-bold text-gray-400 pr-2 rounded-md ${selectedVote && viewMode === 'MY' ? 'cursor-pointer hover:bg-gray-200 hover:text-blue-600' : ''}`}>{selectedVote && viewMode === 'MY' ? '전체선택' : ''}</div>
@@ -305,7 +366,16 @@ export default function DynamicTimeGrid({ config, currentUser, isHost = false, o
                 }
 
                 return (
-                  <div key={key} onClick={() => handleCellClick(d, t)} className={cellClasses}>
+                  // 💡 마우스 및 터치 이벤트 연결부
+                  <div 
+                    key={key} 
+                    data-key={key}
+                    onMouseDown={() => handlePointerDown(key)}
+                    onMouseEnter={() => handlePointerEnter(key)}
+                    onTouchStart={() => handlePointerDown(key)}
+                    onTouchMove={handleTouchMove}
+                    className={cellClasses}
+                  >
                     {viewMode === 'ALL' && displayCount > 0 && <span className={`text-[12px] font-extrabold ${textColor}`}>{displayCount}명</span>}
                     {(cell?.comments && cell.comments.length > 0) && <div className="absolute top-0 right-1 text-sm z-10 drop-shadow-md">💬</div>}
                   </div>
